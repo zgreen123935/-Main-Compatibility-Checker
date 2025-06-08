@@ -172,9 +172,9 @@ function performPreciseWireAnalysis(text: string, ocrConfidence: number, hocr?: 
   // Analyze wire connections using enhanced heuristics
   const wireConnections = analyzeWireConnectionsPrecise(detectedTerminals, text, hocr)
 
-  // Extract only terminals with high confidence wire connections
+  // Extract only terminals with moderate confidence wire connections
   const connectedWires = wireConnections
-    .filter((connection) => connection.hasWire && connection.confidence > 0.6)
+    .filter((connection) => connection.hasWire && connection.confidence > 0.5) // Lowered from 0.6
     .map((connection) => connection.terminal)
 
   // Thermostat validation
@@ -182,25 +182,31 @@ function performPreciseWireAnalysis(text: string, ocrConfidence: number, hocr?: 
 
   const hasThermostatKeywords = thermostatKeywords.some((keyword) => normalizedText.includes(keyword))
 
-  // Calculate confidence with stricter criteria
+  // Calculate confidence with better balance
   let confidence = 0
 
-  if (detectedTerminals.length >= 8) {
+  if (detectedTerminals.length >= 10) {
     confidence += 50
     reasons.push(`Found ${detectedTerminals.length} terminal labels`)
+  } else if (detectedTerminals.length >= 7) {
+    confidence += 40
+    reasons.push(`Found ${detectedTerminals.length} terminal labels`)
   } else if (detectedTerminals.length >= 5) {
-    confidence += 35
+    confidence += 30
     reasons.push(`Found ${detectedTerminals.length} terminal labels`)
   } else if (detectedTerminals.length >= 3) {
     confidence += 20
     reasons.push(`Found ${detectedTerminals.length} terminal labels`)
   }
 
-  if (connectedWires.length >= 5) {
+  if (connectedWires.length >= 6) {
     confidence += 40
     reasons.push(`Detected ${connectedWires.length} wire connections`)
-  } else if (connectedWires.length >= 3) {
-    confidence += 25
+  } else if (connectedWires.length >= 4) {
+    confidence += 30
+    reasons.push(`Detected ${connectedWires.length} wire connections`)
+  } else if (connectedWires.length >= 2) {
+    confidence += 20
     reasons.push(`Detected ${connectedWires.length} wire connections`)
   }
 
@@ -256,55 +262,86 @@ function findPreciseTerminalLabels(text: string, validLabels: string[], excludeW
       return
     }
 
-    // Very strict pattern matching - must be isolated terminal labels
-    const strictPatterns = [
-      // Exact word boundaries
-      new RegExp(`\\b${label}\\b(?!\\s+(HEAT|COOL|FAN|WIRE|TERMINAL|STRIPS|MODE|VALVE))`, "g"),
-      // Terminal with number (like Y1, W2)
-      new RegExp(`\\b${label}\\d+\\b(?!\\s+(HEAT|COOL|FAN|WIRE|TERMINAL))`, "g"),
+    // More balanced pattern matching - not too strict, not too loose
+    const balancedPatterns = [
+      // Exact word boundaries with some flexibility
+      new RegExp(`\\b${label}\\b(?!\\s+(STRIPS|MODE|VALVE|CONTACTOR|BLOWER))`, "g"),
+      // Terminal with number (like Y1, W2, AUX1)
+      new RegExp(`\\b${label}\\d+\\b`, "g"),
       // Terminal with +/- (like ACC+, ACC-)
       new RegExp(`\\b${label}[\\+\\-]\\b`, "g"),
       // Combined terminals (like O/B)
-      ...(label.includes("/") ? [new RegExp(`\\b${label}\\b`, "g")] : []),
+      ...(label.includes("/") ? [new RegExp(`\\b${label.replace("/", "\\/")}\\b`, "g")] : []),
+      // Allow some common variations
+      ...(label === "C" ? [/\bCOM\b/g, /\bCOMMON\b(?!\s+(WIRE|TERMINAL))/g] : []),
+      ...(label === "AUX1" ? [/\bW1\s*\$$\s*AUX1?\s*\$$/g] : []),
+      ...(label === "AUX2" ? [/\bW2\s*\$$\s*AUX2?\s*\$$/g] : []),
     ]
 
-    // Additional check: make sure it's not part of a longer descriptive phrase
-    const isValidTerminal = strictPatterns.some((pattern) => {
+    // Check if any pattern matches
+    const hasMatch = balancedPatterns.some((pattern) => {
       const matches = normalizedText.match(pattern)
       if (!matches) return false
 
-      // For each match, check context to ensure it's a terminal label
+      // For each match, do lighter context checking
       return matches.some((match) => {
         const matchIndex = normalizedText.indexOf(match)
-        const beforeText = normalizedText.substring(Math.max(0, matchIndex - 20), matchIndex)
-        const afterText = normalizedText.substring(matchIndex + match.length, matchIndex + match.length + 20)
+        const beforeText = normalizedText.substring(Math.max(0, matchIndex - 15), matchIndex)
+        const afterText = normalizedText.substring(matchIndex + match.length, matchIndex + match.length + 15)
 
-        // Exclude if surrounded by descriptive text
-        const hasDescriptiveBefore = excludeWords.some((word) => beforeText.includes(word))
-        const hasDescriptiveAfter = excludeWords.some((word) => afterText.includes(word))
+        // Only exclude if it's clearly part of a descriptive phrase
+        const isDescriptivePhrase =
+          (beforeText.includes("ELECTRIC") && afterText.includes("STRIPS")) ||
+          (beforeText.includes("REVERSING") && afterText.includes("VALVE")) ||
+          (beforeText.includes("24V") && afterText.includes("HEAT")) ||
+          (match === "COMMON" && (beforeText.includes("24V") || afterText.includes("WIRE")))
 
-        // Allow if it looks like a terminal (short, isolated, or with numbers/symbols)
-        const looksLikeTerminal = match.length <= 4 || /\d/.test(match) || /[+\-/]/.test(match)
-
-        return looksLikeTerminal && !hasDescriptiveBefore && !hasDescriptiveAfter
+        return !isDescriptivePhrase
       })
     })
 
-    if (isValidTerminal) {
+    if (hasMatch) {
       foundLabels.push(label)
     }
   })
 
-  // Special handling for combined labels
-  if (normalizedText.includes("O/B") && !foundLabels.includes("O/B")) {
+  // Special handling for combined and variant labels
+  if ((normalizedText.includes("O/B") || normalizedText.includes("OB")) && !foundLabels.includes("O/B")) {
     foundLabels.push("O/B")
+  }
+
+  // Handle AUX variations
+  if (normalizedText.includes("AUX1") && !foundLabels.includes("AUX1")) {
+    foundLabels.push("AUX1")
+  }
+  if (normalizedText.includes("AUX2") && !foundLabels.includes("AUX2")) {
+    foundLabels.push("AUX2")
   }
 
   // Remove duplicates and sort by common terminal priority
   const uniqueLabels = [...new Set(foundLabels)]
 
   // Prioritize common terminals
-  const commonTerminals = ["R", "RH", "RC", "C", "Y", "Y1", "Y2", "G", "W", "W1", "W2", "O", "B", "O/B"]
+  const commonTerminals = [
+    "R",
+    "RH",
+    "RC",
+    "C",
+    "Y",
+    "Y1",
+    "Y2",
+    "G",
+    "W",
+    "W1",
+    "W2",
+    "O",
+    "B",
+    "O/B",
+    "ACC+",
+    "ACC-",
+    "AUX1",
+    "AUX2",
+  ]
   const sortedLabels = uniqueLabels.sort((a, b) => {
     const aIndex = commonTerminals.indexOf(a)
     const bIndex = commonTerminals.indexOf(b)
@@ -319,59 +356,82 @@ function findPreciseTerminalLabels(text: string, validLabels: string[], excludeW
 
 function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?: string): WireConnection[] {
   const wireConnections: WireConnection[] = []
+  const normalizedText = text.toUpperCase()
 
-  // Common wire-to-terminal associations with higher precision
+  // Enhanced wire-to-terminal associations
   const wireAssociations = [
     { terminals: ["R", "RH", "RC"], colors: ["red"], confidence: 0.9, essential: true },
-    { terminals: ["C", "COM"], colors: ["blue", "black"], confidence: 0.8, essential: true },
+    { terminals: ["C", "COM"], colors: ["blue", "black"], confidence: 0.85, essential: true },
     { terminals: ["Y", "Y1"], colors: ["yellow"], confidence: 0.9, essential: true },
     { terminals: ["G", "G1"], colors: ["green"], confidence: 0.9, essential: true },
-    { terminals: ["W", "W1"], colors: ["white"], confidence: 0.8, essential: true },
+    { terminals: ["W", "W1", "AUX1"], colors: ["white"], confidence: 0.85, essential: true },
     { terminals: ["O", "O/B"], colors: ["orange"], confidence: 0.8, essential: false },
-    { terminals: ["Y2"], colors: ["yellow"], confidence: 0.7, essential: false },
-    { terminals: ["W2"], colors: ["white"], confidence: 0.7, essential: false },
-    { terminals: ["B"], colors: ["blue"], confidence: 0.6, essential: false },
-    { terminals: ["ACC+", "ACC-", "AUX1", "AUX2"], colors: [], confidence: 0.4, essential: false },
+    { terminals: ["Y2"], colors: ["yellow"], confidence: 0.75, essential: false },
+    { terminals: ["W2", "AUX2"], colors: ["white", "gray"], confidence: 0.75, essential: false },
+    { terminals: ["B"], colors: ["blue"], confidence: 0.7, essential: false },
+    { terminals: ["ACC+", "ACC-"], colors: ["gray", "brown", "black"], confidence: 0.6, essential: false },
   ]
+
+  // Check for wire color mentions in text
+  const wireColorMentions = {
+    red: /red/i.test(text),
+    blue: /blue/i.test(text),
+    yellow: /yellow/i.test(text),
+    green: /green/i.test(text),
+    white: /white/i.test(text),
+    orange: /orange/i.test(text),
+    gray: /(gray|grey)/i.test(text),
+    brown: /brown/i.test(text),
+    black: /black/i.test(text),
+  }
+
+  // Count total color mentions to estimate wire count
+  const colorMentionCount = Object.values(wireColorMentions).filter(Boolean).length
 
   terminals.forEach((terminal) => {
     let hasWire = false
     let wireColor: string | undefined
-    let confidence = 0.3 // Lower default confidence
+    let confidence = 0.4 // Moderate default confidence
 
     // Find association for this terminal
     const association = wireAssociations.find((assoc) =>
-      assoc.terminals.some((t) => terminal === t || terminal.includes(t)),
+      assoc.terminals.some((t) => terminal === t || terminal.includes(t) || t.includes(terminal)),
     )
 
     if (association) {
-      // Essential terminals are more likely to have wires
+      // Essential terminals are very likely to have wires
       if (association.essential) {
         hasWire = true
         confidence = association.confidence
       } else {
-        // Optional terminals need more evidence
-        hasWire = false
-        confidence = association.confidence * 0.7
+        // Optional terminals - moderate likelihood
+        hasWire = true
+        confidence = association.confidence * 0.8
       }
 
       // Check for wire color mentions
       if (association.colors.length > 0) {
-        const colorMentioned = association.colors.some((color) => {
-          const colorPatterns = [
-            new RegExp(`${color}\\s+wire`, "i"),
-            new RegExp(`wire.*${color}`, "i"),
-            new RegExp(`\\b${color}\\b`, "i"),
-          ]
-          return colorPatterns.some((pattern) => pattern.test(text))
-        })
+        const mentionedColor = association.colors.find(
+          (color) => wireColorMentions[color as keyof typeof wireColorMentions],
+        )
 
-        if (colorMentioned) {
+        if (mentionedColor) {
           hasWire = true
-          wireColor = association.colors[0]
-          confidence = Math.min(0.95, confidence + 0.2)
+          wireColor = mentionedColor
+          confidence = Math.min(0.95, confidence + 0.15)
         }
       }
+    }
+
+    // Special logic for specific terminals
+    if (terminal === "O/B" && (normalizedText.includes("REVERSING") || normalizedText.includes("HEAT PUMP"))) {
+      hasWire = true
+      confidence = Math.max(confidence, 0.8)
+    }
+
+    // If we have many color mentions, be more generous with wire detection
+    if (colorMentionCount >= 5 && confidence > 0.5) {
+      hasWire = true
     }
 
     wireConnections.push({
