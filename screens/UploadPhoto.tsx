@@ -5,20 +5,27 @@ import type React from "react"
 import { useState } from "react"
 import { InstallButton } from "../shared/components/InstallButton"
 import { useInstall } from "../shared/context/InstallContext"
+import { PhotoGuide } from "../shared/components/PhotoGuide"
+
+interface AnalysisResult {
+  isThermostatImage: boolean
+  systemType: "heat-pump" | "conventional" | "unknown"
+  detectedWires: string[]
+  confidence: number
+  reasons: string[]
+}
 
 export function UploadPhoto() {
   const { dispatch } = useInstall()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [analysisComplete, setAnalysisComplete] = useState(false)
-  const [detectedSystem, setDetectedSystem] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
         alert("File size must be less than 5MB")
         return
       }
@@ -28,24 +35,210 @@ export function UploadPhoto() {
       setPreviewUrl(url)
       dispatch({ type: "SET_PHOTO", url })
 
-      // Simulate image analysis
-      analyzeImage(url)
+      // Analyze the image properly
+      await analyzeImage(file)
     }
   }
 
-  const analyzeImage = async (imageUrl: string) => {
+  const analyzeImage = async (file: File) => {
     setIsAnalyzing(true)
 
-    // In a real implementation, we would use a proper image analysis service
-    // This is just a simulation for demonstration purposes
-    setTimeout(() => {
-      // Randomly determine if it's a heat pump or conventional system
-      // In a real implementation, this would be based on actual image analysis
-      const isHeatPump = Math.random() > 0.5
-      setDetectedSystem(isHeatPump ? "heat-pump" : "conventional")
+    try {
+      // Use the same OCR analysis as the WireDetection component
+      const formData = new FormData()
+      formData.append("image", file)
+
+      const response = await fetch("/api/analyze-wiring", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAnalysisResult({
+          isThermostatImage: result.isThermostatImage,
+          systemType: result.systemType,
+          detectedWires: result.detectedWires || [],
+          confidence: result.confidence,
+          reasons: result.reasons || [],
+        })
+      } else {
+        // Fallback to client-side analysis if API fails
+        await performClientSideAnalysis(file)
+      }
+    } catch (error) {
+      console.error("Analysis error:", error)
+      // Fallback to client-side analysis
+      await performClientSideAnalysis(file)
+    } finally {
       setIsAnalyzing(false)
-      setAnalysisComplete(true)
-    }, 2000)
+    }
+  }
+
+  const performClientSideAnalysis = async (file: File) => {
+    try {
+      // Import Tesseract.js dynamically to avoid SSR issues
+      const { createWorker } = await import("tesseract.js")
+      const worker = await createWorker()
+
+      await worker.setParameters({
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_",
+      })
+
+      const { data } = await worker.recognize(file)
+      const result = analyzeImageContent(data.text, data.confidence)
+      setAnalysisResult(result)
+
+      await worker.terminate()
+    } catch (error) {
+      console.error("Client-side analysis error:", error)
+      // Set a default "unknown" result if analysis fails
+      setAnalysisResult({
+        isThermostatImage: false,
+        systemType: "unknown",
+        detectedWires: [],
+        confidence: 0,
+        reasons: ["Analysis failed - please use manual selection"],
+      })
+    }
+  }
+
+  const analyzeImageContent = (text: string, ocrConfidence: number): AnalysisResult => {
+    const normalizedText = text.toUpperCase()
+    const reasons: string[] = []
+
+    // Thermostat wire labels
+    const thermostatWireLabels = ["R", "Rh", "Rc", "W", "W1", "W2", "Y", "Y1", "Y2", "G", "C", "O", "B", "E", "AUX"]
+    const detectedWires = findWireLabels(text, thermostatWireLabels)
+
+    // Thermostat indicators
+    const thermostatKeywords = ["THERMOSTAT", "HVAC", "HEAT", "COOL", "FAN", "TERMINAL", "WIRE"]
+    const hasThermostatKeywords = thermostatKeywords.some((keyword) => normalizedText.includes(keyword))
+
+    // Non-thermostat indicators
+    const nonThermostatKeywords = [
+      "SPREADSHEET",
+      "EXCEL",
+      "TABLE",
+      "CHART",
+      "GRAPH",
+      "DOCUMENT",
+      "PDF",
+      "INVOICE",
+      "RECEIPT",
+      "MENU",
+      "PRICE",
+      "COST",
+      "TOTAL",
+      "SUM",
+      "AMOUNT",
+      "EMAIL",
+      "MESSAGE",
+      "TEXT",
+      "PARAGRAPH",
+      "ARTICLE",
+      "BOOK",
+      "PAGE",
+      "CELL",
+      "ROW",
+      "COLUMN",
+      "FORMULA",
+      "FUNCTION",
+      "DATA",
+      "REPORT",
+      "FEATURE",
+      "CATEGORY",
+      "HARDWARE",
+      "SOFTWARE",
+      "COMPATIBILITY",
+      "CONNECTIVITY",
+      "SENSORS",
+    ]
+    const hasNonThermostatKeywords = nonThermostatKeywords.some((keyword) => normalizedText.includes(keyword))
+
+    // Calculate confidence
+    let confidence = 0
+
+    // Wire label analysis
+    if (detectedWires.length >= 3) {
+      confidence += 50
+      reasons.push(`Found ${detectedWires.length} wire labels`)
+    } else if (detectedWires.length >= 2) {
+      confidence += 30
+      reasons.push(`Found ${detectedWires.length} wire labels`)
+    } else if (detectedWires.length === 1) {
+      confidence += 10
+      reasons.push("Found 1 wire label")
+    }
+
+    // Keyword analysis
+    if (hasThermostatKeywords) {
+      confidence += 25
+      reasons.push("Contains thermostat-related keywords")
+    }
+
+    if (hasNonThermostatKeywords) {
+      confidence -= 40
+      reasons.push("Contains document/spreadsheet content")
+    }
+
+    // Text density analysis
+    const wordCount = normalizedText.split(/\s+/).filter((word) => word.length > 0).length
+    if (wordCount > 100) {
+      confidence -= 25
+      reasons.push("Too much text for a thermostat")
+    }
+
+    // OCR quality factor
+    if (ocrConfidence < 60) {
+      confidence -= 15
+      reasons.push("Low image quality")
+    }
+
+    // Number pattern analysis (spreadsheets often have many numbers)
+    const numberMatches = text.match(/\d+/g) || []
+    if (numberMatches.length > 20) {
+      confidence -= 20
+      reasons.push("Contains many numbers (typical of spreadsheets)")
+    }
+
+    // Final confidence calculation
+    confidence = Math.max(0, Math.min(100, confidence))
+
+    // Determine if this is a thermostat image
+    const isThermostatImage = confidence >= 40 && detectedWires.length >= 1 && !hasNonThermostatKeywords
+
+    // Analyze system type only if it's a thermostat image
+    let systemType: "heat-pump" | "conventional" | "unknown" = "unknown"
+    if (isThermostatImage) {
+      if (detectedWires.includes("O") || detectedWires.includes("B")) {
+        systemType = "heat-pump"
+      } else if (detectedWires.includes("W") || detectedWires.includes("W1")) {
+        systemType = "conventional"
+      }
+    }
+
+    return {
+      isThermostatImage,
+      systemType,
+      detectedWires,
+      confidence,
+      reasons,
+    }
+  }
+
+  const findWireLabels = (text: string, labelList: string[]): string[] => {
+    const normalizedText = text.toUpperCase().replace(/\s/g, "")
+    const foundLabels: string[] = []
+
+    labelList.forEach((label) => {
+      const regex = new RegExp(`(^|[^A-Z0-9])${label}([^A-Z0-9]|$)`, "g")
+      if (regex.test(normalizedText)) {
+        foundLabels.push(label)
+      }
+    })
+
+    return [...new Set(foundLabels)]
   }
 
   const handleSystemConfirmation = (isHeatPump: boolean) => {
@@ -63,6 +256,13 @@ export function UploadPhoto() {
     dispatch({ type: "SET_STEP", step: "remove-cover" })
   }
 
+  const handleRetakePhoto = () => {
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setAnalysisResult(null)
+    setIsAnalyzing(false)
+  }
+
   return (
     <div className="min-h-screen bg-white px-6 py-8">
       <div className="max-w-2xl mx-auto">
@@ -73,6 +273,8 @@ export function UploadPhoto() {
             help later when connecting wires to your new Mysa.
           </p>
         </div>
+
+        <PhotoGuide />
 
         <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-8">
           {previewUrl ? (
@@ -86,27 +288,73 @@ export function UploadPhoto() {
               {isAnalyzing ? (
                 <div className="flex flex-col items-center">
                   <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
-                  <p className="text-[#4B5563]">Analyzing wiring...</p>
+                  <p className="text-[#4B5563]">Analyzing image...</p>
                 </div>
-              ) : analysisComplete && detectedSystem ? (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <h3 className="font-medium text-blue-800 mb-2">System Detection Results:</h3>
-                  <p className="text-blue-700 mb-3">
-                    We detected what appears to be a {detectedSystem === "heat-pump" ? "heat pump" : "conventional"}{" "}
-                    system. Is this correct?
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <button
-                      onClick={() => handleSystemConfirmation(detectedSystem === "heat-pump")}
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Yes, that's correct
-                    </button>
-                    <button
-                      onClick={() => handleSystemConfirmation(detectedSystem !== "heat-pump")}
-                      className="bg-white text-blue-600 border border-blue-300 px-4 py-2 rounded-lg hover:bg-blue-50"
-                    >
-                      No, it's a {detectedSystem === "heat-pump" ? "conventional" : "heat pump"} system
+              ) : analysisResult ? (
+                <div>
+                  {analysisResult.isThermostatImage ? (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                      <h3 className="font-medium text-green-800 mb-2">✅ Thermostat Detected</h3>
+                      <p className="text-green-700 mb-3">
+                        Confidence: {analysisResult.confidence}% - {analysisResult.reasons.join(", ")}
+                      </p>
+                      {analysisResult.systemType !== "unknown" && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                          <h3 className="font-medium text-blue-800 mb-2">System Detection Results:</h3>
+                          <p className="text-blue-700 mb-3">
+                            We detected what appears to be a{" "}
+                            {analysisResult.systemType === "heat-pump" ? "heat pump" : "conventional"} system. Is this
+                            correct?
+                          </p>
+                          <div className="flex justify-center gap-3">
+                            <button
+                              onClick={() => handleSystemConfirmation(analysisResult.systemType === "heat-pump")}
+                              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                            >
+                              Yes, that's correct
+                            </button>
+                            <button
+                              onClick={() => handleSystemConfirmation(analysisResult.systemType !== "heat-pump")}
+                              className="bg-white text-blue-600 border border-blue-300 px-4 py-2 rounded-lg hover:bg-blue-50"
+                            >
+                              No, it's a {analysisResult.systemType === "heat-pump" ? "conventional" : "heat pump"}{" "}
+                              system
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {analysisResult.detectedWires.length > 0 && (
+                        <div>
+                          <p className="font-medium text-green-800 mb-2">Detected Wires:</p>
+                          <div className="flex flex-wrap justify-center gap-2">
+                            {analysisResult.detectedWires.map((wire) => (
+                              <span
+                                key={wire}
+                                className="bg-[#BAE5D4] text-[#2D2D2D] px-3 py-1 rounded-full font-medium"
+                              >
+                                {wire}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                      <h3 className="font-medium text-red-800 mb-2">⚠️ Not a Thermostat Image</h3>
+                      <p className="text-red-700 text-sm mb-3">
+                        This doesn't appear to be a thermostat wiring photo. Reasons:{" "}
+                        {analysisResult.reasons.join(", ")}
+                      </p>
+                      <p className="text-red-700 text-sm">
+                        Please upload a clear photo of your thermostat's wiring terminals, or continue without a photo.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 justify-center">
+                    <button onClick={handleRetakePhoto} className="text-[#2D2D2D] underline">
+                      Try another photo
                     </button>
                   </div>
                 </div>
@@ -131,7 +379,7 @@ export function UploadPhoto() {
         </div>
 
         <div className="space-y-4">
-          {!analysisComplete && (
+          {!isAnalyzing && (!analysisResult || analysisResult.systemType === "unknown") && (
             <InstallButton
               title={selectedFile ? "Continue with Photo" : "Continue"}
               onPress={handleContinue}
