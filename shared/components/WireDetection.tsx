@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { InstallButton } from "./InstallButton"
 import { PhotoGuide } from "./PhotoGuide"
-import { TrainingFeedback } from "./TrainingFeedback"
+import { InteractiveTraining } from "./InteractiveTraining"
 
 interface WireConnection {
   terminal: string
@@ -36,34 +36,9 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [selectedWires, setSelectedWires] = useState<string[]>([])
   const [ocrComplete, setOcrComplete] = useState(false)
-  const [showTrainingFeedback, setShowTrainingFeedback] = useState(false)
-  const [manualMode, setManualMode] = useState(false)
+  const [showInteractiveTraining, setShowInteractiveTraining] = useState(false)
   const [originalFile, setOriginalFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Common thermostat terminals for manual selection
-  const commonTerminals = [
-    "R",
-    "Rc",
-    "Rh",
-    "C",
-    "Y",
-    "Y1",
-    "Y2",
-    "G",
-    "W",
-    "W1",
-    "W2",
-    "O",
-    "B",
-    "O/B",
-    "ACC+",
-    "ACC-",
-    "AUX",
-    "E",
-    "L",
-    "S",
-  ]
 
   useEffect(() => {
     if (analysisResult?.connectedWires) {
@@ -112,7 +87,7 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
         connectedWires: [],
         confidence: 0,
         isThermostatImage: false,
-        reasons: ["Analysis failed. Please try again or use manual selection."],
+        reasons: ["Analysis failed. Please use interactive training to correct."],
         imageHash: "",
       })
     } finally {
@@ -121,21 +96,17 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     }
   }
 
-  const handleWireToggle = (terminal: string) => {
-    setSelectedWires((prev) => (prev.includes(terminal) ? prev.filter((w) => w !== terminal) : [...prev, terminal]))
+  const handleStartTraining = () => {
+    setShowInteractiveTraining(true)
   }
 
-  const handleConfirm = () => {
-    // Show training feedback if we have analysis results
-    if (analysisResult && originalFile) {
-      setShowTrainingFeedback(true)
-    } else {
-      onWiresDetected(selectedWires)
-    }
+  const handleTrainingComplete = (correctedWires: string[]) => {
+    setSelectedWires(correctedWires)
+    setShowInteractiveTraining(false)
+    onWiresDetected(correctedWires)
   }
 
-  const handleTrainingSubmitted = () => {
-    setShowTrainingFeedback(false)
+  const handleQuickConfirm = () => {
     onWiresDetected(selectedWires)
   }
 
@@ -144,30 +115,26 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     setAnalysisResult(null)
     setOcrComplete(false)
     setSelectedWires([])
-  }
-
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return "text-green-600"
-    if (confidence >= 0.6) return "text-yellow-600"
-    return "text-red-600"
+    setShowInteractiveTraining(false)
   }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">Smart Wire Detection</h3>
+      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">Smart Wire Detection & Training</h3>
 
       <div className="mb-6">
         <p className="text-[#4B5563] mb-4">
-          Take a clear photo of your thermostat wiring. Our AI learns from every installation to improve detection
-          accuracy.
+          Upload a photo and help train our AI by correcting any detection errors. Your corrections improve the system
+          for everyone!
         </p>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h4 className="font-medium text-blue-800 mb-2">🧠 AI Learning System:</h4>
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="font-medium text-blue-800 mb-2">🎯 Interactive Training Mode:</h4>
           <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Your feedback helps improve detection for everyone</li>
-            <li>• We compare against thousands of verified installations</li>
-            <li>• Detection accuracy improves with each submission</li>
+            <li>• Click on terminals in your photo to mark wire connections</li>
+            <li>• Correct any mistakes the AI made</li>
+            <li>• Add terminals the AI missed</li>
+            <li>• Your corrections train the AI for better future detection</li>
           </ul>
         </div>
 
@@ -177,7 +144,7 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
         {!previewUrl ? (
           <div
-            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#BAE5D4]"
+            className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[#BAE5D4] transition-colors"
             onClick={triggerFileInput}
           >
             <div className="text-6xl mb-4">📷</div>
@@ -189,123 +156,73 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
             <img
               src={previewUrl || "/placeholder.svg"}
               alt="Uploaded image"
-              className="max-h-64 mx-auto mb-4 rounded-lg"
+              className="max-h-64 mx-auto mb-4 rounded-lg border"
             />
 
             {isProcessing ? (
               <div className="flex flex-col items-center">
                 <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
-                <p className="text-[#4B5563]">Analyzing with AI and comparing to training database...</p>
+                <p className="text-[#4B5563]">Analyzing image with AI...</p>
               </div>
             ) : ocrComplete && analysisResult ? (
               <div>
-                {analysisResult.isThermostatImage ? (
+                {analysisResult.confidence > 50 ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className="font-medium text-green-800">✅ Thermostat Detected</h4>
+                    <h4 className="font-medium text-green-800 mb-2">✅ Detection Results</h4>
+                    <p className="text-green-700 text-sm mb-3">
+                      Confidence: {analysisResult.confidence}% | Found {analysisResult.connectedWires.length} wire
+                      connections
+                    </p>
+
+                    {analysisResult.connectedWires.length > 0 && (
+                      <div className="mb-3">
+                        <strong className="text-green-800">Detected wires:</strong>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {analysisResult.connectedWires.map((wire) => (
+                            <span
+                              key={wire}
+                              className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium"
+                            >
+                              {wire}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 justify-center">
                       <button
-                        onClick={() => setManualMode(!manualMode)}
-                        className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full transition-colors"
+                        onClick={handleQuickConfirm}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
                       >
-                        {manualMode ? "Use AI Detection" : "Manual Override"}
+                        ✓ Looks Correct
+                      </button>
+                      <button
+                        onClick={handleStartTraining}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                      >
+                        🎯 Correct & Train
                       </button>
                     </div>
-
-                    {analysisResult.similarConfigurations && analysisResult.similarConfigurations.length > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                        <h5 className="font-medium text-blue-800 mb-1">🔍 Training Data Match</h5>
-                        <p className="text-sm text-blue-700">
-                          Found {analysisResult.similarConfigurations.length} similar configurations in our database.
-                          Detection enhanced with verified patterns.
-                        </p>
-                      </div>
-                    )}
-
-                    {!manualMode ? (
-                      <div className="mb-4">
-                        <h5 className="font-medium text-green-800 mb-2">AI-Detected Wire Connections:</h5>
-                        <p className="text-sm text-green-700 mb-3">
-                          Review and correct the detected connections. Your feedback improves our AI.
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-2">
-                          {analysisResult.wireConnections?.map((connection) => {
-                            const isSelected = selectedWires.includes(connection.terminal)
-
-                            return (
-                              <label
-                                key={connection.terminal}
-                                className={`flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                                  isSelected ? "border-[#BAE5D4] bg-green-50" : "border-gray-200 hover:border-gray-300"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => handleWireToggle(connection.terminal)}
-                                  className="rounded"
-                                />
-                                <div className="flex-1">
-                                  <span className="font-medium text-[#2D2D2D]">{connection.terminal}</span>
-                                  {connection.wireColor && (
-                                    <span className="text-xs text-gray-600 ml-2">({connection.wireColor})</span>
-                                  )}
-                                  <div className={`text-xs ${getConfidenceColor(connection.confidence)}`}>
-                                    {Math.round(connection.confidence * 100)}% confidence
-                                  </div>
-                                </div>
-                              </label>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mb-4">
-                        <h5 className="font-medium text-green-800 mb-2">Manual Terminal Selection:</h5>
-                        <div className="flex flex-wrap gap-2">
-                          {commonTerminals.map((terminal) => (
-                            <button
-                              key={terminal}
-                              onClick={() => handleWireToggle(terminal)}
-                              className={`px-3 py-1 rounded-full text-sm ${
-                                selectedWires.includes(terminal)
-                                  ? "bg-[#BAE5D4] text-[#2D2D2D]"
-                                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                              }`}
-                            >
-                              {terminal}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-3 text-sm text-green-700">
-                      Selected: {selectedWires.length} terminals with wires
-                    </div>
-
-                    {analysisResult.reasons && analysisResult.reasons.length > 0 && (
-                      <div className="mt-4 text-sm text-green-700">
-                        <strong>Analysis notes:</strong>
-                        <ul className="list-disc pl-5 mt-1">
-                          {analysisResult.reasons.map((reason, index) => (
-                            <li key={index}>{reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Unclear Image</h4>
-                    <p className="text-yellow-700 text-sm">
-                      We couldn't clearly identify this as a thermostat. Your feedback will help us improve detection.
+                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Low Confidence Detection</h4>
+                    <p className="text-yellow-700 text-sm mb-3">
+                      Detection confidence: {analysisResult.confidence}%. Please help train the AI by marking the
+                      correct connections.
                     </p>
+                    <button
+                      onClick={handleStartTraining}
+                      className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
+                    >
+                      🎯 Start Interactive Training
+                    </button>
                   </div>
                 )}
 
-                <div className="flex gap-2 justify-center">
-                  <button onClick={triggerFileInput} className="text-[#2D2D2D] underline">
+                <div className="flex gap-2 justify-center mt-3">
+                  <button onClick={triggerFileInput} className="text-[#2D2D2D] underline text-sm">
                     Try another photo
                   </button>
                 </div>
@@ -315,24 +232,32 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <InstallButton
-          title={`Continue with Selected Wires (${selectedWires.length})`}
-          onPress={handleConfirm}
-          disabled={isProcessing || selectedWires.length === 0}
-        />
-        <InstallButton title="Skip - Select Wires Manually" onPress={onSkip} variant="secondary" />
-      </div>
+      {!showInteractiveTraining && (
+        <div className="flex flex-col gap-3">
+          {analysisResult && selectedWires.length > 0 ? (
+            <InstallButton
+              title={`Continue with ${selectedWires.length} Selected Wires`}
+              onPress={handleQuickConfirm}
+              disabled={isProcessing}
+            />
+          ) : (
+            <InstallButton
+              title={previewUrl ? "Start Interactive Training" : "Upload Photo"}
+              onPress={previewUrl ? handleStartTraining : triggerFileInput}
+              disabled={isProcessing}
+            />
+          )}
+          <InstallButton title="Skip - Select Wires Manually" onPress={onSkip} variant="secondary" />
+        </div>
+      )}
 
-      {showTrainingFeedback && analysisResult && originalFile && (
-        <TrainingFeedback
-          originalImage={originalFile}
-          imageUrl={previewUrl!}
-          imageHash={analysisResult.imageHash}
-          aiDetectedConnections={analysisResult.wireConnections}
-          userSelectedWires={selectedWires}
-          onSubmit={handleTrainingSubmitted}
-          onSkip={handleTrainingSubmitted}
+      {showInteractiveTraining && originalFile && previewUrl && (
+        <InteractiveTraining
+          imageFile={originalFile}
+          imageUrl={previewUrl}
+          initialDetection={analysisResult}
+          onComplete={handleTrainingComplete}
+          onCancel={() => setShowInteractiveTraining(false)}
         />
       )}
     </div>
