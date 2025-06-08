@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import { InstallButton } from "./InstallButton"
-import { createWorker } from "tesseract.js"
 import { useInstall } from "../context/InstallContext"
 import { PhotoGuide } from "./PhotoGuide"
 
@@ -28,36 +27,6 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { state } = useInstall()
 
-  // Common thermostat wire labels to look for
-  const thermostatWireLabels = ["R", "Rh", "Rc", "W", "W1", "W2", "Y", "Y1", "Y2", "G", "C", "O", "B", "E", "AUX"]
-
-  // Keywords that suggest this is a thermostat image
-  const thermostatKeywords = ["THERMOSTAT", "HVAC", "HEAT", "COOL", "FAN", "TERMINAL", "WIRE"]
-
-  // Keywords that suggest this is NOT a thermostat image
-  const nonThermostatKeywords = [
-    "SPREADSHEET",
-    "EXCEL",
-    "TABLE",
-    "CHART",
-    "GRAPH",
-    "DOCUMENT",
-    "PDF",
-    "INVOICE",
-    "RECEIPT",
-    "MENU",
-    "PRICE",
-    "COST",
-    "TOTAL",
-    "SUM",
-    "EMAIL",
-    "MESSAGE",
-    "TEXT",
-    "PARAGRAPH",
-    "ARTICLE",
-    "BOOK",
-  ]
-
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -71,114 +40,141 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     setPreviewUrl(url)
 
     // Process the image with OCR
-    await processImage(url)
+    await processImage(file)
   }
 
-  const processImage = async (imageUrl: string) => {
+  const processImage = async (file: File) => {
     setIsProcessing(true)
 
     try {
-      // Initialize Tesseract.js worker
-      const worker = await createWorker()
+      // Use the server API for analysis
+      const formData = new FormData()
+      formData.append("image", file)
 
-      // Set options to optimize for thermostat terminal labels
-      await worker.setParameters({
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_",
+      const response = await fetch("/api/analyze-wiring", {
+        method: "POST",
+        body: formData,
       })
 
-      // Recognize text in the image
-      const { data } = await worker.recognize(imageUrl)
-
-      // Analyze the results
-      const result = analyzeImageContent(data.text, data.confidence)
-      setAnalysisResult(result)
-
-      // Terminate worker to free memory
-      await worker.terminate()
-      setOcrComplete(true)
+      if (response.ok) {
+        const result = await response.json()
+        setAnalysisResult({
+          detectedWires: result.detectedWires || [],
+          confidence: result.confidence,
+          isThermostatImage: result.isThermostatImage,
+          reasons: result.reasons || [],
+        })
+      } else {
+        // Fallback to client-side analysis if API fails
+        await performClientSideAnalysis(file)
+      }
     } catch (error) {
-      console.error("OCR processing error:", error)
-      alert("Error processing image. Please try again or use manual selection.")
+      console.error("Analysis error:", error)
+      // Fallback to client-side analysis
+      await performClientSideAnalysis(file)
     } finally {
       setIsProcessing(false)
+      setOcrComplete(true)
     }
   }
 
-  const analyzeImageContent = (text: string, confidence: number): AnalysisResult => {
+  const performClientSideAnalysis = async (file: File) => {
+    try {
+      // Import Tesseract.js dynamically to avoid SSR issues
+      const { createWorker } = await import("tesseract.js")
+      const worker = await createWorker()
+
+      await worker.setParameters({
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_",
+        tessedit_pageseg_mode: "6", // Assume a single uniform block of text
+      })
+
+      const { data } = await worker.recognize(file)
+
+      // Thermostat wire labels - expanded to include more variations
+      const thermostatWireLabels = [
+        "R",
+        "Rh",
+        "Rc",
+        "W",
+        "W1",
+        "W2",
+        "Y",
+        "Y1",
+        "Y2",
+        "G",
+        "G1",
+        "C",
+        "O",
+        "B",
+        "E",
+        "AUX",
+        "COM",
+        "COMMON",
+        "HEAT",
+        "COOL",
+        "FAN",
+        "PWR",
+        "POWER",
+        "24V",
+        "24VAC",
+      ]
+
+      // Find wire labels with more flexible matching
+      const detectedWires = findWireLabelsEnhanced(data.text, thermostatWireLabels)
+
+      // More lenient detection for thermostat images
+      const isThermostatImage = detectedWires.length > 0 || /thermostat|hvac|heat|cool|wire|terminal/i.test(data.text)
+
+      setAnalysisResult({
+        detectedWires,
+        confidence: detectedWires.length > 0 ? 70 : 30,
+        isThermostatImage,
+        reasons:
+          detectedWires.length > 0
+            ? [`Found ${detectedWires.length} wire labels`]
+            : ["No wire labels detected, but may be a thermostat"],
+      })
+
+      await worker.terminate()
+    } catch (error) {
+      console.error("Client-side analysis error:", error)
+      setAnalysisResult({
+        detectedWires: [],
+        confidence: 0,
+        isThermostatImage: false,
+        reasons: ["Analysis failed - please try again or use manual selection"],
+      })
+    }
+  }
+
+  function findWireLabelsEnhanced(text: string, labelList: string[]): string[] {
     const normalizedText = text.toUpperCase()
-    const reasons: string[] = []
-
-    // Check for thermostat-specific wire labels
-    const detectedWires = findWireLabels(text, thermostatWireLabels)
-
-    // Check for thermostat-related keywords
-    const hasThermostatKeywords = thermostatKeywords.some((keyword) => normalizedText.includes(keyword))
-
-    // Check for non-thermostat keywords
-    const hasNonThermostatKeywords = nonThermostatKeywords.some((keyword) => normalizedText.includes(keyword))
-
-    // Calculate confidence that this is a thermostat image
-    let thermostatConfidence = 0
-
-    // Wire labels found (strong indicator)
-    if (detectedWires.length >= 2) {
-      thermostatConfidence += 40
-      reasons.push(`Found ${detectedWires.length} wire labels`)
-    } else if (detectedWires.length === 1) {
-      thermostatConfidence += 15
-      reasons.push(`Found 1 wire label`)
-    }
-
-    // Thermostat keywords found
-    if (hasThermostatKeywords) {
-      thermostatConfidence += 20
-      reasons.push("Contains thermostat-related text")
-    }
-
-    // Non-thermostat keywords found (negative indicator)
-    if (hasNonThermostatKeywords) {
-      thermostatConfidence -= 30
-      reasons.push("Contains non-thermostat content")
-    }
-
-    // OCR confidence factor
-    if (confidence < 50) {
-      thermostatConfidence -= 10
-      reasons.push("Low image quality detected")
-    }
-
-    // Text length analysis (thermostats usually have minimal text)
-    const wordCount = normalizedText.split(/\s+/).length
-    if (wordCount > 50) {
-      thermostatConfidence -= 15
-      reasons.push("Too much text for a thermostat")
-    }
-
-    // Check for common thermostat wire patterns
-    const hasWirePattern = /[RWYGOBC]\d*\s*[-:]\s*[RWYGOBC]\d*/i.test(text)
-    if (hasWirePattern) {
-      thermostatConfidence += 25
-      reasons.push("Found wire connection patterns")
-    }
-
-    const isThermostatImage = thermostatConfidence >= 30 && detectedWires.length >= 1
-
-    return {
-      detectedWires,
-      confidence: Math.max(0, Math.min(100, thermostatConfidence)),
-      isThermostatImage,
-      reasons,
-    }
-  }
-
-  const findWireLabels = (text: string, labelList: string[]): string[] => {
-    const normalizedText = text.toUpperCase().replace(/\s/g, "")
     const foundLabels: string[] = []
 
+    // First try exact matches with word boundaries
     labelList.forEach((label) => {
-      // More strict pattern matching for wire labels
-      const regex = new RegExp(`(^|[^A-Z0-9])${label}([^A-Z0-9]|$)`, "g")
-      if (regex.test(normalizedText)) {
+      // More flexible pattern matching for wire labels
+      const patterns = [
+        new RegExp(`(^|[^A-Z0-9])${label}([^A-Z0-9]|$)`, "g"), // Standard boundary match
+        new RegExp(`${label}\\s*(WIRE|TERMINAL)`, "g"), // Label followed by WIRE or TERMINAL
+        new RegExp(`(WIRE|TERMINAL)\\s*${label}`, "g"), // WIRE or TERMINAL followed by label
+        new RegExp(`${label}\\s*:\\s*`, "g"), // Label followed by colon
+        new RegExp(`"${label}"`, "g"), // Label in quotes
+        new RegExp(`\$$${label}\$$`, "g"), // Label in parentheses
+      ]
+
+      if (patterns.some((pattern) => pattern.test(normalizedText))) {
+        foundLabels.push(label)
+      }
+    })
+
+    // Then try more aggressive matching for single-letter labels (R, W, Y, G, C, O, B)
+    const singleLetterLabels = labelList.filter((label) => label.length === 1)
+    singleLetterLabels.forEach((label) => {
+      // Look for isolated occurrences of the letter that might be wire labels
+      const matches = normalizedText.match(new RegExp(`[^A-Z]${label}[^A-Z]`, "g"))
+      if (matches && matches.length > 0 && !foundLabels.includes(label)) {
         foundLabels.push(label)
       }
     })
@@ -187,8 +183,11 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
   }
 
   const handleConfirm = () => {
-    if (analysisResult && analysisResult.isThermostatImage) {
+    if (analysisResult && analysisResult.detectedWires.length > 0) {
       onWiresDetected(analysisResult.detectedWires)
+    } else {
+      // If no wires detected but user confirms, just continue
+      onSkip()
     }
   }
 
@@ -236,37 +235,25 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
               </div>
             ) : ocrComplete && analysisResult ? (
               <div>
-                {analysisResult.isThermostatImage ? (
+                {analysisResult.detectedWires.length > 0 ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-green-800 mb-2">✅ Thermostat Detected</h4>
-                    <p className="text-green-700 text-sm mb-3">
-                      Confidence: {analysisResult.confidence}% - {analysisResult.reasons.join(", ")}
-                    </p>
-                    {analysisResult.detectedWires.length > 0 ? (
-                      <div>
-                        <p className="font-medium text-green-800 mb-2">Detected Wires:</p>
-                        <div className="flex flex-wrap justify-center gap-2">
-                          {analysisResult.detectedWires.map((wire) => (
-                            <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-3 py-1 rounded-full font-medium">
-                              {wire}
-                            </span>
-                          ))}
-                        </div>
+                    <h4 className="font-medium text-green-800 mb-2">✅ Wires Detected</h4>
+                    <div>
+                      <p className="font-medium text-green-800 mb-2">Detected Wires:</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {analysisResult.detectedWires.map((wire) => (
+                          <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-3 py-1 rounded-full font-medium">
+                            {wire}
+                          </span>
+                        ))}
                       </div>
-                    ) : (
-                      <p className="text-green-700">
-                        No specific wire labels detected, but image appears to be a thermostat.
-                      </p>
-                    )}
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-red-800 mb-2">⚠️ Not a Thermostat Image</h4>
-                    <p className="text-red-700 text-sm mb-3">
-                      This doesn't appear to be a thermostat wiring photo. Reasons: {analysisResult.reasons.join(", ")}
-                    </p>
-                    <p className="text-red-700 text-sm">
-                      Please upload a clear photo of your thermostat's wiring terminals, or use manual selection.
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ No Wire Labels Detected</h4>
+                    <p className="text-yellow-700 text-sm">
+                      We couldn't identify specific wire labels. Try taking a clearer photo or use manual selection.
                     </p>
                   </div>
                 )}
@@ -283,12 +270,12 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        {analysisResult?.isThermostatImage && analysisResult.detectedWires.length > 0 ? (
+        {analysisResult?.detectedWires.length ? (
           <InstallButton title="Use Detected Wires" onPress={handleConfirm} disabled={isProcessing} />
         ) : (
           <InstallButton
-            title="Upload Photo"
-            onPress={triggerFileInput}
+            title={previewUrl ? "Continue with Photo" : "Upload Photo"}
+            onPress={previewUrl ? handleConfirm : triggerFileInput}
             disabled={isProcessing}
             loading={isProcessing}
           />
