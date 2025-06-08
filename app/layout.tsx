@@ -1,19 +1,20 @@
-import type { ReactNode } from "react"
-import { AppProvider } from "@/context/AppContext"
-import "./globals.css"
+import type { Metadata } from 'next'
+import './globals.css'
 
-export const metadata = {
-  title: 'Mysa Thermostat Compatibility Checker',
-  description: 'Check if your heating system is compatible with Mysa smart thermostats',
-  generator: 'v0.dev'
+export const metadata: Metadata = {
+  title: 'v0 App',
+  description: 'Created with v0',
+  generator: 'v0.dev',
 }
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
   return (
     <html lang="en">
-      <body>
-        <AppProvider>{children}</AppProvider>
-      </body>
+      <body>{children}</body>
     </html>
   )
 }

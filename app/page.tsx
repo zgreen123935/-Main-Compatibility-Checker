@@ -1,6 +1,5 @@
-import CompatibilityChecker from "@/components/compatibility-checker"
+import App from "../app"
 
-export default function Home() {
-  return <CompatibilityChecker />
+export default function Page() {
+  return <App />
 }
-
