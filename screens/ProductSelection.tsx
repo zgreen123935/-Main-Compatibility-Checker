@@ -14,10 +14,10 @@ export function ProductSelection() {
     <div className="min-h-screen bg-white flex flex-col justify-center px-6 py-12">
       <div className="max-w-2xl mx-auto w-full">
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-medium text-[#2D2D2D] mb-6 leading-tight">
+          <h1 className="text-4xl md:text-5xl font-medium text-primaryBlack mb-6 leading-tight">
             Welcome to Mysa Installation
           </h1>
-          <p className="text-xl text-[#4B5563] leading-relaxed max-w-lg mx-auto">
+          <p className="text-xl text-bodyText leading-relaxed max-w-lg mx-auto">
             This guide will help you install your Mysa thermostat in about 30 minutes.
           </p>
         </div>
@@ -38,7 +38,7 @@ export function ProductSelection() {
         </div>
 
         <div className="text-center pt-8 border-t border-gray-200">
-          <p className="text-[#6B7280] italic">
+          <p className="text-secondaryText italic">
             Thank you for choosing Mysa. You're helping the environment—doing something is better than nothing.
           </p>
         </div>

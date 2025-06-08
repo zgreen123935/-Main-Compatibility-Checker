@@ -20,8 +20,8 @@ export function InstallButton({
   const baseClasses = "px-8 py-3 rounded-lg font-semibold min-h-12 flex items-center justify-center transition-colors"
 
   const variantClasses = {
-    primary: "bg-[#2D2D2D] text-white hover:bg-gray-800 disabled:bg-gray-400",
-    secondary: "bg-white text-[#2D2D2D] border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100",
+    primary: "bg-primaryBlack text-white hover:bg-gray-800 disabled:bg-gray-400",
+    secondary: "bg-white text-primaryBlack border border-gray-300 hover:bg-gray-50 disabled:bg-gray-100",
   }
 
   return (
