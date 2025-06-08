@@ -74,37 +74,45 @@ async function analyzeWithOpenAIVision(base64Image: string, mimeType: string): P
     throw new Error("OpenAI API key not configured")
   }
 
-  const prompt = `Analyze this thermostat wiring image and provide a detailed analysis. I need you to:
+  const prompt = `You are analyzing a thermostat wiring image. I need you to be EXTREMELY PRECISE about which terminals actually have physical wires connected to them.
 
-1. Identify ALL terminal labels visible (like R, RH, RC, C, Y, Y1, Y2, G, W, W1, W2, O, B, O/B, ACC+, ACC-, AUX1, AUX2, etc.)
-2. For EACH terminal, determine if there is actually a wire connected to it
-3. If there's a wire, try to identify the wire color
-4. Determine if this is a heat pump system (look for O, B, or O/B terminals and "reversing valve" text)
-5. Assess overall confidence that this is a thermostat wiring image
+CRITICAL INSTRUCTIONS:
+1. Look carefully at each terminal and ONLY mark "hasWire: true" if you can see an actual physical wire (colored cable) going INTO that specific terminal
+2. Do NOT assume a terminal has a wire just because you see the terminal label
+3. Empty terminals with no wires should have "hasWire: false"
+4. Be very careful to distinguish between similar terminal labels (like Rc vs RH, or ACC+ vs ACC-)
+5. Follow the wire from its color to the exact terminal it connects to
+
+WHAT TO LOOK FOR:
+- Physical colored wires (red, blue, yellow, green, white, orange, black, etc.)
+- The exact terminal each wire connects to
+- Empty terminals that have labels but no wires
+
+COMMON TERMINALS TO CHECK:
+R, RH, RC, C, Y, Y1, Y2, G, W, W1, W2, O, B, O/B, ACC+, ACC-, AUX1, AUX2
 
 Please respond in this exact JSON format:
 {
-  "detectedTerminals": ["R", "C", "Y1", "G", "W1", "O/B", "Y2", "W2", "ACC+", "ACC-", "AUX1"],
+  "detectedTerminals": ["list of ALL terminal labels you can see"],
   "wireConnections": [
-    {"terminal": "R", "hasWire": true, "wireColor": "red", "confidence": 0.9},
-    {"terminal": "C", "hasWire": true, "wireColor": "blue", "confidence": 0.85},
+    {"terminal": "RH", "hasWire": true, "wireColor": "red", "confidence": 0.95},
+    {"terminal": "RC", "hasWire": false, "confidence": 0.9},
+    {"terminal": "C", "hasWire": true, "wireColor": "blue", "confidence": 0.9},
     {"terminal": "Y1", "hasWire": true, "wireColor": "yellow", "confidence": 0.9},
     {"terminal": "G", "hasWire": true, "wireColor": "green", "confidence": 0.9},
-    {"terminal": "W1", "hasWire": true, "wireColor": "white", "confidence": 0.85},
+    {"terminal": "W2", "hasWire": true, "wireColor": "white", "confidence": 0.85},
     {"terminal": "O/B", "hasWire": true, "wireColor": "orange", "confidence": 0.8},
-    {"terminal": "Y2", "hasWire": false, "confidence": 0.3},
-    {"terminal": "W2", "hasWire": true, "wireColor": "gray", "confidence": 0.7},
-    {"terminal": "ACC+", "hasWire": false, "confidence": 0.2},
-    {"terminal": "ACC-", "hasWire": false, "confidence": 0.2}
+    {"terminal": "ACC+", "hasWire": true, "wireColor": "black", "confidence": 0.8},
+    {"terminal": "ACC-", "hasWire": false, "confidence": 0.9}
   ],
   "systemType": "heat-pump",
   "confidence": 95,
   "isThermostatImage": true,
   "reasons": ["Clear terminal labels visible", "Multiple wire connections detected", "Heat pump indicators present"],
-  "suggestions": ["All terminals clearly visible", "Wire connections are obvious"]
+  "suggestions": ["Wire connections are clearly visible"]
 }
 
-Focus on accuracy - only mark hasWire as true if you can clearly see a wire connected to that specific terminal.`
+REMEMBER: Only mark hasWire=true if you can actually see a physical wire connected to that terminal. Be conservative - if you're not sure, mark it as false.`
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -133,7 +141,7 @@ Focus on accuracy - only mark hasWire as true if you can clearly see a wire conn
         },
       ],
       max_tokens: 1000,
-      temperature: 0.1, // Low temperature for consistent analysis
+      temperature: 0.05, // Very low temperature for maximum consistency
     }),
   })
 
@@ -157,10 +165,10 @@ Focus on accuracy - only mark hasWire as true if you can clearly see a wire conn
 
     const analysisData = JSON.parse(jsonMatch[0])
 
-    // Extract connected wires from wire connections
+    // Extract connected wires from wire connections with higher confidence threshold
     const connectedWires =
       analysisData.wireConnections
-        ?.filter((conn: WireConnection) => conn.hasWire && conn.confidence > 0.5)
+        ?.filter((conn: WireConnection) => conn.hasWire && conn.confidence > 0.6) // Increased threshold
         ?.map((conn: WireConnection) => conn.terminal) || []
 
     return {
