@@ -11,6 +11,7 @@ export function ConfigWireIdentification() {
   const [selectedWires, setSelectedWires] = useState<string[]>([])
   const [otherWires, setOtherWires] = useState("")
   const [showManualSelection, setShowManualSelection] = useState(false)
+  const [showTrainingMode, setShowTrainingMode] = useState(false)
 
   // Check if user has a heat pump to show appropriate wires
   const hasHeatPump = state.answers.heatPump
@@ -40,7 +41,6 @@ export function ConfigWireIdentification() {
   ]
 
   const commonWires = hasHeatPump ? heatPumpWires : conventionalWires
-
   const lessCommonWires = ["Y3", "W3", "OB/O/B", "W/B", "Y/O", "Multipurpose (*)"]
 
   const handleWireToggle = (wire: string) => {
@@ -48,16 +48,7 @@ export function ConfigWireIdentification() {
   }
 
   const handleWiresDetected = (detectedWires: string[]) => {
-    // Normalize detected wires to match our format
-    const normalizedWires = detectedWires.map((wire) => {
-      // Handle special cases like "W/W1" vs "W" or "W1"
-      if (wire === "W" || wire === "W1") return "W / W1"
-      if (wire === "Y" || wire === "Y1") return "Y / Y1"
-      if (wire === "G" || wire === "G1") return "G / G1"
-      return wire
-    })
-
-    setSelectedWires(normalizedWires)
+    setSelectedWires(detectedWires)
     setShowManualSelection(true)
   }
 
@@ -83,8 +74,63 @@ export function ConfigWireIdentification() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-medium text-[#2D2D2D] mb-6">Wire Identification</h1>
           <p className="text-[#4B5563] leading-relaxed">
-            Which wires does your old thermostat have? We can help identify them automatically.
+            Which wires does your old thermostat have? Choose your preferred method below.
           </p>
+        </div>
+
+        {/* Method Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div
+            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+              showTrainingMode ? "border-[#BAE5D4] bg-green-50" : "border-gray-200 hover:border-gray-300"
+            }`}
+            onClick={() => {
+              setShowTrainingMode(true)
+              setShowManualSelection(false)
+            }}
+          >
+            <div className="text-center">
+              <div className="text-3xl mb-2">🎯</div>
+              <h3 className="font-medium text-[#2D2D2D] mb-2">AI Training Mode</h3>
+              <p className="text-sm text-[#4B5563]">
+                Upload photo, train AI by clicking on terminals, help improve detection
+              </p>
+            </div>
+          </div>
+
+          <div
+            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+              !showTrainingMode && !showManualSelection
+                ? "border-[#BAE5D4] bg-green-50"
+                : "border-gray-200 hover:border-gray-300"
+            }`}
+            onClick={() => {
+              setShowTrainingMode(false)
+              setShowManualSelection(false)
+            }}
+          >
+            <div className="text-center">
+              <div className="text-3xl mb-2">🤖</div>
+              <h3 className="font-medium text-[#2D2D2D] mb-2">Smart Detection</h3>
+              <p className="text-sm text-[#4B5563]">Upload photo, let AI detect wires, quick review and confirm</p>
+            </div>
+          </div>
+
+          <div
+            className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+              showManualSelection ? "border-[#BAE5D4] bg-green-50" : "border-gray-200 hover:border-gray-300"
+            }`}
+            onClick={() => {
+              setShowManualSelection(true)
+              setShowTrainingMode(false)
+            }}
+          >
+            <div className="text-center">
+              <div className="text-3xl mb-2">✋</div>
+              <h3 className="font-medium text-[#2D2D2D] mb-2">Manual Selection</h3>
+              <p className="text-sm text-[#4B5563]">Skip photo upload, manually select wires from list</p>
+            </div>
+          </div>
         </div>
 
         {hasHeatPump && (
@@ -105,14 +151,57 @@ export function ConfigWireIdentification() {
           </div>
         )}
 
-        {!showManualSelection ? (
-          <WireDetection onWiresDetected={handleWiresDetected} onSkip={() => setShowManualSelection(true)} />
-        ) : (
+        {/* Training Mode */}
+        {showTrainingMode && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-4">
+              <h3 className="font-medium text-purple-800 mb-2">🎯 AI Training Mode Active</h3>
+              <p className="text-purple-700 text-sm">
+                This mode helps improve our AI detection for everyone. Upload a photo and click directly on wire
+                terminals to train the system.
+              </p>
+            </div>
+            <WireDetection
+              onWiresDetected={handleWiresDetected}
+              onSkip={() => setShowManualSelection(true)}
+              trainingMode={true}
+            />
+          </div>
+        )}
+
+        {/* Smart Detection Mode */}
+        {!showTrainingMode && !showManualSelection && (
+          <div className="mb-8">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 className="font-medium text-blue-800 mb-2">🤖 Smart Detection Mode</h3>
+              <p className="text-blue-700 text-sm">
+                Upload a photo and our AI will automatically detect wire connections. You can review and correct if
+                needed.
+              </p>
+            </div>
+            <WireDetection
+              onWiresDetected={handleWiresDetected}
+              onSkip={() => setShowManualSelection(true)}
+              trainingMode={false}
+            />
+          </div>
+        )}
+
+        {/* Manual Selection Mode */}
+        {showManualSelection && (
           <>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="font-medium text-gray-800 mb-2">✋ Manual Selection Mode</h3>
+              <p className="text-gray-700 text-sm">
+                Select wires manually from the list below. This is the traditional method if you prefer not to use photo
+                detection.
+              </p>
+            </div>
+
             <div className="mb-8">
               <h3 className="text-lg font-medium text-[#2D2D2D] mb-4">
                 {selectedWires.length > 0
-                  ? "Detected Wires (Verify or Modify):"
+                  ? "Verify or Modify Selected Wires:"
                   : `Common Wires for ${hasHeatPump ? "Heat Pump" : "Conventional"} Systems:`}
               </h3>
               <div className="space-y-3">

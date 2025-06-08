@@ -17,6 +17,7 @@ interface WireConnection {
 interface WireDetectionProps {
   onWiresDetected: (wires: string[]) => void
   onSkip: () => void
+  trainingMode?: boolean
 }
 
 interface AnalysisResult {
@@ -30,7 +31,7 @@ interface AnalysisResult {
   similarConfigurations?: any[]
 }
 
-export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
+export function WireDetection({ onWiresDetected, onSkip, trainingMode = false }: WireDetectionProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
@@ -58,7 +59,14 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     setOriginalFile(file)
     const url = URL.createObjectURL(file)
     setPreviewUrl(url)
-    await processImage(file)
+
+    if (trainingMode) {
+      // In training mode, go directly to interactive training
+      setShowInteractiveTraining(true)
+    } else {
+      // In smart detection mode, analyze first
+      await processImage(file)
+    }
   }
 
   const processImage = async (file: File) => {
@@ -118,25 +126,29 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     setShowInteractiveTraining(false)
   }
 
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return "text-green-600"
+    if (confidence >= 0.6) return "text-yellow-600"
+    return "text-red-600"
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">Smart Wire Detection & Training</h3>
+      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">
+        {trainingMode ? "AI Training Mode" : "Smart Wire Detection"}
+      </h3>
 
       <div className="mb-6">
-        <p className="text-[#4B5563] mb-4">
-          Upload a photo and help train our AI by correcting any detection errors. Your corrections improve the system
-          for everyone!
-        </p>
-
-        <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-4 mb-4">
-          <h4 className="font-medium text-blue-800 mb-2">🎯 Interactive Training Mode:</h4>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• Click on terminals in your photo to mark wire connections</li>
-            <li>• Correct any mistakes the AI made</li>
-            <li>• Add terminals the AI missed</li>
-            <li>• Your corrections train the AI for better future detection</li>
-          </ul>
-        </div>
+        {trainingMode ? (
+          <p className="text-[#4B5563] mb-4">
+            Upload a photo and click directly on wire terminals to train our AI. Your training helps improve detection
+            for everyone!
+          </p>
+        ) : (
+          <p className="text-[#4B5563] mb-4">
+            Upload a photo and our AI will automatically detect wire connections. You can review and correct if needed.
+          </p>
+        )}
 
         <PhotoGuide />
 
@@ -148,7 +160,9 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
             onClick={triggerFileInput}
           >
             <div className="text-6xl mb-4">📷</div>
-            <p className="text-[#6B7280] mb-2">Click to upload a photo of your thermostat wiring</p>
+            <p className="text-[#6B7280] mb-2">
+              {trainingMode ? "Upload photo to start training" : "Upload photo for AI detection"}
+            </p>
             <p className="text-sm text-[#6B7280]">JPG or PNG, max 5MB</p>
           </div>
         ) : (
@@ -164,7 +178,7 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
                 <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
                 <p className="text-[#4B5563]">Analyzing image with AI...</p>
               </div>
-            ) : ocrComplete && analysisResult ? (
+            ) : ocrComplete && analysisResult && !trainingMode ? (
               <div>
                 {analysisResult.confidence > 50 ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
@@ -227,12 +241,25 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
                   </button>
                 </div>
               </div>
+            ) : trainingMode ? (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                <h4 className="font-medium text-purple-800 mb-2">🎯 Ready for Training</h4>
+                <p className="text-purple-700 text-sm mb-3">
+                  Click "Start Interactive Training" to begin marking wire connections on your photo.
+                </p>
+                <button
+                  onClick={handleStartTraining}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
+                >
+                  🎯 Start Interactive Training
+                </button>
+              </div>
             ) : null}
           </div>
         )}
       </div>
 
-      {!showInteractiveTraining && (
+      {!showInteractiveTraining && !trainingMode && (
         <div className="flex flex-col gap-3">
           {analysisResult && selectedWires.length > 0 ? (
             <InstallButton
