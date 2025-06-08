@@ -88,19 +88,17 @@ export function InteractiveTraining({
     if (!imageRef.current || !containerRef.current) return
 
     const rect = imageRef.current.getBoundingClientRect()
-    const containerRect = containerRef.current.getBoundingClientRect()
-
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
     // Check if clicking on existing point to remove it
-    const existingPointIndex = clickPoints.findIndex((point) => Math.abs(point.x - x) < 3 && Math.abs(point.y - y) < 3)
+    const existingPointIndex = clickPoints.findIndex((point) => Math.abs(point.x - x) < 5 && Math.abs(point.y - y) < 5)
 
     if (existingPointIndex !== -1) {
       // Remove existing point
       setClickPoints((prev) => prev.filter((_, index) => index !== existingPointIndex))
     } else {
-      // Add new point
+      // Add new point - allow multiple terminals with same name
       const newPoint: ClickPoint = {
         x,
         y,
@@ -165,8 +163,13 @@ export function InteractiveTraining({
   }
 
   const getSelectedWires = () => {
-    const wires = clickPoints.map((point) => point.terminal)
-    return [...new Set(wires)] // Remove duplicates
+    // Get unique terminals, but allow multiple clicks for same terminal
+    const terminalCounts: Record<string, number> = {}
+    clickPoints.forEach((point) => {
+      terminalCounts[point.terminal] = (terminalCounts[point.terminal] || 0) + 1
+    })
+
+    return Object.keys(terminalCounts)
   }
 
   return (
@@ -244,19 +247,27 @@ export function InteractiveTraining({
                 <div>
                   <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Terminal to mark:</label>
                   <div className="grid grid-cols-4 gap-2">
-                    {commonTerminals.map((terminal) => (
-                      <button
-                        key={terminal}
-                        onClick={() => setSelectedTerminal(terminal)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                          selectedTerminal === terminal
-                            ? "bg-[#BAE5D4] text-[#2D2D2D] border-2 border-[#2D2D2D]"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                        }`}
-                      >
-                        {terminal}
-                      </button>
-                    ))}
+                    {commonTerminals.map((terminal) => {
+                      const count = clickPoints.filter((p) => p.terminal === terminal).length
+                      return (
+                        <button
+                          key={terminal}
+                          onClick={() => setSelectedTerminal(terminal)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium relative ${
+                            selectedTerminal === terminal
+                              ? "bg-[#BAE5D4] text-[#2D2D2D] border-2 border-[#2D2D2D]"
+                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                          }`}
+                        >
+                          {terminal}
+                          {count > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
 

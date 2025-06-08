@@ -18,6 +18,7 @@ interface WireDetectionProps {
   onWiresDetected: (wires: string[]) => void
   onSkip: () => void
   trainingMode?: boolean
+  onSystemDetected?: (systemType: "heat-pump" | "conventional" | "unknown") => void
 }
 
 interface AnalysisResult {
@@ -31,7 +32,7 @@ interface AnalysisResult {
   similarConfigurations?: any[]
 }
 
-export function WireDetection({ onWiresDetected, onSkip, trainingMode = false }: WireDetectionProps) {
+export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, onSystemDetected }: WireDetectionProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
@@ -84,6 +85,11 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false }:
       if (response.ok) {
         const result = await response.json()
         setAnalysisResult(result)
+
+        // Notify parent of system type detection
+        if (onSystemDetected && result.systemType) {
+          onSystemDetected(result.systemType)
+        }
       } else {
         throw new Error("Analysis failed")
       }
