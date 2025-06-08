@@ -74,45 +74,58 @@ async function analyzeWithOpenAIVision(base64Image: string, mimeType: string): P
     throw new Error("OpenAI API key not configured")
   }
 
-  const prompt = `You are analyzing a thermostat wiring image. I need you to be EXTREMELY PRECISE about which terminals actually have physical wires connected to them.
+  const prompt = `You are analyzing a thermostat wiring image. I need you to be EXTREMELY THOROUGH and check EVERY SINGLE terminal for wire connections.
 
 CRITICAL INSTRUCTIONS:
-1. Look carefully at each terminal and ONLY mark "hasWire: true" if you can see an actual physical wire (colored cable) going INTO that specific terminal
-2. Do NOT assume a terminal has a wire just because you see the terminal label
-3. Empty terminals with no wires should have "hasWire: false"
-4. Be very careful to distinguish between similar terminal labels (like Rc vs RH, or ACC+ vs ACC-)
-5. Follow the wire from its color to the exact terminal it connects to
+1. Examine EVERY terminal label you can see in the image
+2. For EACH terminal, look carefully to see if there is a physical colored wire connected to it
+3. Pay special attention to ALL terminals including: R, RH, RC, C, Y, Y1, Y2, G, W, W1, W2, O, B, O/B, ACC+, ACC-, AUX1, AUX2, E, EM
+4. Do NOT miss any terminals - check the entire wiring area systematically
+5. Look for wires of ALL colors: red, blue, yellow, green, white, orange, black, brown, gray, purple, pink
+6. Be especially careful with black wires as they can be harder to see
+7. Check both the left and right terminal blocks thoroughly
 
-WHAT TO LOOK FOR:
-- Physical colored wires (red, blue, yellow, green, white, orange, black, etc.)
-- The exact terminal each wire connects to
-- Empty terminals that have labels but no wires
+SYSTEMATIC APPROACH:
+- Start from the left terminal block and check each terminal
+- Move to the right terminal block and check each terminal  
+- Look for any additional terminals or connections
+- Double-check that you haven't missed any wires, especially darker colored ones
 
-COMMON TERMINALS TO CHECK:
-R, RH, RC, C, Y, Y1, Y2, G, W, W1, W2, O, B, O/B, ACC+, ACC-, AUX1, AUX2
+WHAT CONSTITUTES A WIRE CONNECTION:
+- A colored wire (cable) physically inserted into or connected to a terminal
+- The wire should be clearly going INTO the terminal connection point
+- Empty terminals with just labels but no wires should be marked hasWire: false
 
-Please respond in this exact JSON format:
+Please respond in this exact JSON format and check EVERY terminal systematically:
 {
-  "detectedTerminals": ["list of ALL terminal labels you can see"],
+  "detectedTerminals": ["R", "RH", "RC", "C", "Y1", "Y2", "G", "W1", "W2", "O/B", "ACC+", "ACC-"],
   "wireConnections": [
     {"terminal": "RH", "hasWire": true, "wireColor": "red", "confidence": 0.95},
     {"terminal": "RC", "hasWire": false, "confidence": 0.9},
-    {"terminal": "C", "hasWire": true, "wireColor": "blue", "confidence": 0.9},
-    {"terminal": "Y1", "hasWire": true, "wireColor": "yellow", "confidence": 0.9},
-    {"terminal": "G", "hasWire": true, "wireColor": "green", "confidence": 0.9},
-    {"terminal": "W2", "hasWire": true, "wireColor": "white", "confidence": 0.85},
-    {"terminal": "O/B", "hasWire": true, "wireColor": "orange", "confidence": 0.8},
-    {"terminal": "ACC+", "hasWire": true, "wireColor": "black", "confidence": 0.8},
+    {"terminal": "C", "hasWire": true, "wireColor": "blue", "confidence": 0.95},
+    {"terminal": "Y1", "hasWire": true, "wireColor": "yellow", "confidence": 0.95},
+    {"terminal": "Y2", "hasWire": false, "confidence": 0.9},
+    {"terminal": "G", "hasWire": true, "wireColor": "green", "confidence": 0.95},
+    {"terminal": "W1", "hasWire": false, "confidence": 0.9},
+    {"terminal": "W2", "hasWire": true, "wireColor": "white", "confidence": 0.95},
+    {"terminal": "O/B", "hasWire": true, "wireColor": "orange", "confidence": 0.95},
+    {"terminal": "ACC+", "hasWire": true, "wireColor": "black", "confidence": 0.9},
     {"terminal": "ACC-", "hasWire": false, "confidence": 0.9}
   ],
   "systemType": "heat-pump",
   "confidence": 95,
   "isThermostatImage": true,
   "reasons": ["Clear terminal labels visible", "Multiple wire connections detected", "Heat pump indicators present"],
-  "suggestions": ["Wire connections are clearly visible"]
+  "suggestions": ["All wire connections clearly visible"]
 }
 
-REMEMBER: Only mark hasWire=true if you can actually see a physical wire connected to that terminal. Be conservative - if you're not sure, mark it as false.`
+IMPORTANT: Do not miss ANY wire connections. Check every single terminal methodically. Pay extra attention to:
+- Black wires (they can be harder to spot)
+- ACC+ and ACC- terminals (accessory terminals)
+- Any terminals on the edges or corners
+- Both left and right terminal blocks
+
+Be thorough and systematic in your analysis!`
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -140,8 +153,8 @@ REMEMBER: Only mark hasWire=true if you can actually see a physical wire connect
           ],
         },
       ],
-      max_tokens: 1000,
-      temperature: 0.05, // Very low temperature for maximum consistency
+      max_tokens: 1200, // Increased for more detailed analysis
+      temperature: 0.02, // Even lower temperature for maximum consistency
     }),
   })
 
@@ -165,10 +178,10 @@ REMEMBER: Only mark hasWire=true if you can actually see a physical wire connect
 
     const analysisData = JSON.parse(jsonMatch[0])
 
-    // Extract connected wires from wire connections with higher confidence threshold
+    // Extract connected wires from wire connections - keep threshold at 0.6 but be more inclusive
     const connectedWires =
       analysisData.wireConnections
-        ?.filter((conn: WireConnection) => conn.hasWire && conn.confidence > 0.6) // Increased threshold
+        ?.filter((conn: WireConnection) => conn.hasWire && conn.confidence > 0.5) // Lowered back to 0.5 to catch more connections
         ?.map((conn: WireConnection) => conn.terminal) || []
 
     return {
