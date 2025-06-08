@@ -4,11 +4,13 @@ import { useState } from "react"
 import { InstallButton } from "../shared/components/InstallButton"
 import { TooltipButton } from "../shared/components/TooltipButton"
 import { useInstall } from "../shared/context/InstallContext"
+import { WireDetection } from "../shared/components/WireDetection"
 
 export function ConfigWireIdentification() {
   const { dispatch, state } = useInstall()
   const [selectedWires, setSelectedWires] = useState<string[]>([])
   const [otherWires, setOtherWires] = useState("")
+  const [showManualSelection, setShowManualSelection] = useState(false)
 
   // Check if user has a heat pump to show appropriate wires
   const hasHeatPump = state.answers.heatPump
@@ -45,6 +47,20 @@ export function ConfigWireIdentification() {
     setSelectedWires((prev) => (prev.includes(wire) ? prev.filter((w) => w !== wire) : [...prev, wire]))
   }
 
+  const handleWiresDetected = (detectedWires: string[]) => {
+    // Normalize detected wires to match our format
+    const normalizedWires = detectedWires.map((wire) => {
+      // Handle special cases like "W/W1" vs "W" or "W1"
+      if (wire === "W" || wire === "W1") return "W / W1"
+      if (wire === "Y" || wire === "Y1") return "Y / Y1"
+      if (wire === "G" || wire === "G1") return "G / G1"
+      return wire
+    })
+
+    setSelectedWires(normalizedWires)
+    setShowManualSelection(true)
+  }
+
   const handleContinue = () => {
     const allWires = [...selectedWires]
     if (otherWires.trim()) {
@@ -67,7 +83,7 @@ export function ConfigWireIdentification() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-medium text-[#2D2D2D] mb-6">Wire Identification</h1>
           <p className="text-[#4B5563] leading-relaxed">
-            Which wires does your old thermostat have? Select all that apply.
+            Which wires does your old thermostat have? We can help identify them automatically.
           </p>
         </div>
 
@@ -89,85 +105,95 @@ export function ConfigWireIdentification() {
           </div>
         )}
 
-        <div className="mb-8">
-          <h3 className="text-lg font-medium text-[#2D2D2D] mb-4">
-            Common Wires for {hasHeatPump ? "Heat Pump" : "Conventional"} Systems:
-          </h3>
-          <div className="space-y-3">
-            {commonWires.map((wire) => (
-              <div
-                key={wire.label}
-                className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                  selectedWires.includes(wire.label)
-                    ? "border-[#BAE5D4] bg-green-50"
-                    : "border-gray-200 hover:border-gray-300"
-                }`}
-                onClick={() => handleWireToggle(wire.label)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={selectedWires.includes(wire.label)}
-                      onChange={() => handleWireToggle(wire.label)}
-                      className="mr-3"
-                    />
-                    <div>
-                      <h4 className="font-medium text-[#2D2D2D]">{wire.label}</h4>
-                      <p className="text-sm text-[#4B5563]">{wire.description}</p>
+        {!showManualSelection ? (
+          <WireDetection onWiresDetected={handleWiresDetected} onSkip={() => setShowManualSelection(true)} />
+        ) : (
+          <>
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-[#2D2D2D] mb-4">
+                {selectedWires.length > 0
+                  ? "Detected Wires (Verify or Modify):"
+                  : `Common Wires for ${hasHeatPump ? "Heat Pump" : "Conventional"} Systems:`}
+              </h3>
+              <div className="space-y-3">
+                {commonWires.map((wire) => (
+                  <div
+                    key={wire.label}
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
+                      selectedWires.includes(wire.label)
+                        ? "border-[#BAE5D4] bg-green-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                    onClick={() => handleWireToggle(wire.label)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedWires.includes(wire.label)}
+                          onChange={() => handleWireToggle(wire.label)}
+                          className="mr-3"
+                        />
+                        <div>
+                          <h4 className="font-medium text-[#2D2D2D]">{wire.label}</h4>
+                          <p className="text-sm text-[#4B5563]">{wire.description}</p>
+                        </div>
+                      </div>
+                      <TooltipButton
+                        tooltip={`The ${wire.label} terminal is typically used for ${wire.description.toLowerCase()}. Look for a terminal labeled exactly as shown.`}
+                      >
+                        <span className="text-blue-600 text-lg">ℹ️</span>
+                      </TooltipButton>
                     </div>
                   </div>
-                  <TooltipButton
-                    tooltip={`The ${wire.label} terminal is typically used for ${wire.description.toLowerCase()}. Look for a terminal labeled exactly as shown.`}
-                  >
-                    <span className="text-blue-600 text-lg">ℹ️</span>
-                  </TooltipButton>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <details className="border border-gray-200 rounded-lg">
-            <summary className="p-4 cursor-pointer font-medium text-[#2D2D2D] hover:bg-gray-50">
-              Less Common Wires (click to expand)
-            </summary>
-            <div className="p-4 border-t border-gray-200">
-              <div className="grid grid-cols-2 gap-2">
-                {lessCommonWires.map((wire) => (
-                  <label key={wire} className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedWires.includes(wire)}
-                      onChange={() => handleWireToggle(wire)}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-[#4B5563]">{wire}</span>
-                  </label>
                 ))}
               </div>
             </div>
-          </details>
-        </div>
 
-        <div className="mb-8">
-          <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Other wires (comma-separated):</label>
-          <input
-            type="text"
-            value={otherWires}
-            onChange={(e) => setOtherWires(e.target.value)}
-            placeholder="e.g., X, AUX, E"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#BAE5D4]"
+            <div className="mb-8">
+              <details className="border border-gray-200 rounded-lg">
+                <summary className="p-4 cursor-pointer font-medium text-[#2D2D2D] hover:bg-gray-50">
+                  Less Common Wires (click to expand)
+                </summary>
+                <div className="p-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-2">
+                    {lessCommonWires.map((wire) => (
+                      <label key={wire} className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedWires.includes(wire)}
+                          onChange={() => handleWireToggle(wire)}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-[#4B5563]">{wire}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <div className="mb-8">
+              <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Other wires (comma-separated):</label>
+              <input
+                type="text"
+                value={otherWires}
+                onChange={(e) => setOtherWires(e.target.value)}
+                placeholder="e.g., X, AUX, E"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#BAE5D4]"
+              />
+            </div>
+          </>
+        )}
+
+        {showManualSelection && (
+          <InstallButton
+            title="Continue"
+            onPress={handleContinue}
+            className="w-full"
+            disabled={selectedWires.length === 0}
           />
-        </div>
-
-        <InstallButton
-          title="Continue"
-          onPress={handleContinue}
-          className="w-full"
-          disabled={selectedWires.length === 0}
-        />
+        )}
       </div>
     </div>
   )

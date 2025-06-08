@@ -10,6 +10,9 @@ export function UploadPhoto() {
   const { dispatch } = useInstall()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisComplete, setAnalysisComplete] = useState(false)
+  const [detectedSystem, setDetectedSystem] = useState<string | null>(null)
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -24,7 +27,30 @@ export function UploadPhoto() {
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
       dispatch({ type: "SET_PHOTO", url })
+
+      // Simulate image analysis
+      analyzeImage(url)
     }
+  }
+
+  const analyzeImage = async (imageUrl: string) => {
+    setIsAnalyzing(true)
+
+    // In a real implementation, we would use a proper image analysis service
+    // This is just a simulation for demonstration purposes
+    setTimeout(() => {
+      // Randomly determine if it's a heat pump or conventional system
+      // In a real implementation, this would be based on actual image analysis
+      const isHeatPump = Math.random() > 0.5
+      setDetectedSystem(isHeatPump ? "heat-pump" : "conventional")
+      setIsAnalyzing(false)
+      setAnalysisComplete(true)
+    }, 2000)
+  }
+
+  const handleSystemConfirmation = (isHeatPump: boolean) => {
+    dispatch({ type: "SET_ANSWER", key: "heatPump", value: isHeatPump })
+    handleContinue()
   }
 
   const handleContinue = () => {
@@ -56,7 +82,37 @@ export function UploadPhoto() {
                 alt="Wiring photo preview"
                 className="max-w-full h-64 object-contain mx-auto mb-4 rounded"
               />
-              <p className="text-green-600 font-medium">Photo uploaded successfully!</p>
+
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <p className="text-[#4B5563]">Analyzing wiring...</p>
+                </div>
+              ) : analysisComplete && detectedSystem ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h3 className="font-medium text-blue-800 mb-2">System Detection Results:</h3>
+                  <p className="text-blue-700 mb-3">
+                    We detected what appears to be a {detectedSystem === "heat-pump" ? "heat pump" : "conventional"}{" "}
+                    system. Is this correct?
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={() => handleSystemConfirmation(detectedSystem === "heat-pump")}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                      Yes, that's correct
+                    </button>
+                    <button
+                      onClick={() => handleSystemConfirmation(detectedSystem !== "heat-pump")}
+                      className="bg-white text-blue-600 border border-blue-300 px-4 py-2 rounded-lg hover:bg-blue-50"
+                    >
+                      No, it's a {detectedSystem === "heat-pump" ? "conventional" : "heat pump"} system
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-green-600 font-medium">Photo uploaded successfully!</p>
+              )}
             </div>
           ) : (
             <div>
@@ -75,11 +131,13 @@ export function UploadPhoto() {
         </div>
 
         <div className="space-y-4">
-          <InstallButton
-            title={selectedFile ? "Continue with Photo" : "Continue"}
-            onPress={handleContinue}
-            className="w-full"
-          />
+          {!analysisComplete && (
+            <InstallButton
+              title={selectedFile ? "Continue with Photo" : "Continue"}
+              onPress={handleContinue}
+              className="w-full"
+            />
+          )}
 
           <InstallButton
             title="Skip (I already documented)"
