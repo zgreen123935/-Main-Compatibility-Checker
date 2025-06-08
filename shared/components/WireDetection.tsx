@@ -4,8 +4,14 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import { InstallButton } from "./InstallButton"
-import { useInstall } from "../context/InstallContext"
 import { PhotoGuide } from "./PhotoGuide"
+
+interface WireConnection {
+  terminal: string
+  hasWire: boolean
+  wireColor?: string
+  confidence: number
+}
 
 interface WireDetectionProps {
   onWiresDetected: (wires: string[]) => void
@@ -13,7 +19,9 @@ interface WireDetectionProps {
 }
 
 interface AnalysisResult {
-  detectedWires: string[]
+  detectedTerminals: string[]
+  wireConnections: WireConnection[]
+  connectedWires: string[]
   confidence: number
   isThermostatImage: boolean
   reasons: string[]
@@ -23,9 +31,9 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [selectedWires, setSelectedWires] = useState<string[]>([])
   const [ocrComplete, setOcrComplete] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { state } = useInstall()
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -38,8 +46,6 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
     const url = URL.createObjectURL(file)
     setPreviewUrl(url)
-
-    // Process the image with OCR
     await processImage(file)
   }
 
@@ -47,7 +53,6 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     setIsProcessing(true)
 
     try {
-      // Use the server API for analysis
       const formData = new FormData()
       formData.append("image", file)
 
@@ -58,19 +63,22 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
       if (response.ok) {
         const result = await response.json()
-        setAnalysisResult({
-          detectedWires: result.detectedWires || [],
+        const analysis = {
+          detectedTerminals: result.detectedTerminals || [],
+          wireConnections: result.wireConnections || [],
+          connectedWires: result.connectedWires || [],
           confidence: result.confidence,
           isThermostatImage: result.isThermostatImage,
           reasons: result.reasons || [],
-        })
+        }
+        setAnalysisResult(analysis)
+        // Pre-select the detected connected wires
+        setSelectedWires(analysis.connectedWires)
       } else {
-        // Fallback to client-side analysis if API fails
         await performClientSideAnalysis(file)
       }
     } catch (error) {
       console.error("Analysis error:", error)
-      // Fallback to client-side analysis
       await performClientSideAnalysis(file)
     } finally {
       setIsProcessing(false)
@@ -80,121 +88,101 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
   const performClientSideAnalysis = async (file: File) => {
     try {
-      // Import Tesseract.js dynamically to avoid SSR issues
       const { createWorker } = await import("tesseract.js")
       const worker = await createWorker()
 
       await worker.setParameters({
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_",
-        tessedit_pageseg_mode: "6", // Assume a single uniform block of text
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_+",
+        tessedit_pageseg_mode: "6",
       })
 
       const { data } = await worker.recognize(file)
 
-      // Thermostat wire labels - expanded to include more variations
-      const thermostatWireLabels = [
-        "R",
-        "Rh",
-        "Rc",
-        "W",
-        "W1",
-        "W2",
-        "Y",
-        "Y1",
-        "Y2",
-        "G",
-        "G1",
-        "C",
-        "O",
-        "B",
-        "E",
-        "AUX",
-        "COM",
-        "COMMON",
-        "HEAT",
-        "COOL",
-        "FAN",
-        "PWR",
-        "POWER",
-        "24V",
-        "24VAC",
-      ]
+      // Simple client-side analysis
+      const terminals = findTerminalLabels(data.text)
+      const analysis = {
+        detectedTerminals: terminals,
+        wireConnections: terminals.map((terminal) => ({
+          terminal,
+          hasWire: true, // Assume all detected terminals have wires for client-side
+          confidence: 0.7,
+        })),
+        connectedWires: terminals,
+        confidence: terminals.length > 0 ? 70 : 30,
+        isThermostatImage: terminals.length > 0,
+        reasons: terminals.length > 0 ? [`Found ${terminals.length} terminals`] : ["No terminals detected"],
+      }
 
-      // Find wire labels with more flexible matching
-      const detectedWires = findWireLabelsEnhanced(data.text, thermostatWireLabels)
-
-      // More lenient detection for thermostat images
-      const isThermostatImage = detectedWires.length > 0 || /thermostat|hvac|heat|cool|wire|terminal/i.test(data.text)
-
-      setAnalysisResult({
-        detectedWires,
-        confidence: detectedWires.length > 0 ? 70 : 30,
-        isThermostatImage,
-        reasons:
-          detectedWires.length > 0
-            ? [`Found ${detectedWires.length} wire labels`]
-            : ["No wire labels detected, but may be a thermostat"],
-      })
-
+      setAnalysisResult(analysis)
+      setSelectedWires(analysis.connectedWires)
       await worker.terminate()
     } catch (error) {
       console.error("Client-side analysis error:", error)
       setAnalysisResult({
-        detectedWires: [],
+        detectedTerminals: [],
+        wireConnections: [],
+        connectedWires: [],
         confidence: 0,
         isThermostatImage: false,
-        reasons: ["Analysis failed - please try again or use manual selection"],
+        reasons: ["Analysis failed"],
       })
     }
   }
 
-  function findWireLabelsEnhanced(text: string, labelList: string[]): string[] {
+  function findTerminalLabels(text: string): string[] {
     const normalizedText = text.toUpperCase()
-    const foundLabels: string[] = []
+    const terminals = [
+      "R",
+      "Rh",
+      "Rc",
+      "RH",
+      "RC",
+      "W",
+      "W1",
+      "W2",
+      "Y",
+      "Y1",
+      "Y2",
+      "G",
+      "G1",
+      "C",
+      "COM",
+      "O",
+      "B",
+      "O/B",
+      "AUX",
+      "AUX1",
+      "AUX2",
+      "ACC",
+      "ACC+",
+      "ACC-",
+    ]
 
-    // First try exact matches with word boundaries
-    labelList.forEach((label) => {
-      // More flexible pattern matching for wire labels
-      const patterns = [
-        new RegExp(`(^|[^A-Z0-9])${label}([^A-Z0-9]|$)`, "g"), // Standard boundary match
-        new RegExp(`${label}\\s*(WIRE|TERMINAL)`, "g"), // Label followed by WIRE or TERMINAL
-        new RegExp(`(WIRE|TERMINAL)\\s*${label}`, "g"), // WIRE or TERMINAL followed by label
-        new RegExp(`${label}\\s*:\\s*`, "g"), // Label followed by colon
-        new RegExp(`"${label}"`, "g"), // Label in quotes
-        new RegExp(`\$$${label}\$$`, "g"), // Label in parentheses
-      ]
-
-      if (patterns.some((pattern) => pattern.test(normalizedText))) {
-        foundLabels.push(label)
-      }
+    return terminals.filter((terminal) => {
+      const patterns = [new RegExp(`\\b${terminal}\\b`, "g"), new RegExp(`${terminal}\\s*(WIRE|TERMINAL)`, "g")]
+      return patterns.some((pattern) => pattern.test(normalizedText))
     })
+  }
 
-    // Then try more aggressive matching for single-letter labels (R, W, Y, G, C, O, B)
-    const singleLetterLabels = labelList.filter((label) => label.length === 1)
-    singleLetterLabels.forEach((label) => {
-      // Look for isolated occurrences of the letter that might be wire labels
-      const matches = normalizedText.match(new RegExp(`[^A-Z]${label}[^A-Z]`, "g"))
-      if (matches && matches.length > 0 && !foundLabels.includes(label)) {
-        foundLabels.push(label)
-      }
-    })
-
-    return [...new Set(foundLabels)] // Remove duplicates
+  const handleWireToggle = (terminal: string) => {
+    setSelectedWires((prev) => (prev.includes(terminal) ? prev.filter((w) => w !== terminal) : [...prev, terminal]))
   }
 
   const handleConfirm = () => {
-    if (analysisResult && analysisResult.detectedWires.length > 0) {
-      onWiresDetected(analysisResult.detectedWires)
-    } else {
-      // If no wires detected but user confirms, just continue
-      onSkip()
-    }
+    onWiresDetected(selectedWires)
   }
 
   const triggerFileInput = () => {
     fileInputRef.current?.click()
     setAnalysisResult(null)
     setOcrComplete(false)
+    setSelectedWires([])
+  }
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 0.8) return "text-green-600"
+    if (confidence >= 0.6) return "text-yellow-600"
+    return "text-red-600"
   }
 
   return (
@@ -203,9 +191,19 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
       <div className="mb-6">
         <p className="text-[#4B5563] mb-4">
-          Take a clear photo of your thermostat wiring terminals with labels visible. Our system will try to identify
-          the wire connections automatically.
+          Take a clear photo of your thermostat wiring. We'll identify terminals and try to detect which ones have wires
+          connected.
         </p>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="font-medium text-blue-800 mb-2">📸 Photo Tips for Better Detection:</h4>
+          <ul className="text-sm text-blue-700 space-y-1">
+            <li>• Make sure all wire terminals and labels are clearly visible</li>
+            <li>• Use good lighting - avoid shadows over the wiring area</li>
+            <li>• Take the photo straight-on, not at an angle</li>
+            <li>• Ensure wires and their colors are clearly visible</li>
+          </ul>
+        </div>
 
         <PhotoGuide />
 
@@ -231,29 +229,68 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
             {isProcessing ? (
               <div className="flex flex-col items-center">
                 <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
-                <p className="text-[#4B5563]">Analyzing image...</p>
+                <p className="text-[#4B5563]">Analyzing terminals and wire connections...</p>
               </div>
             ) : ocrComplete && analysisResult ? (
               <div>
-                {analysisResult.detectedWires.length > 0 ? (
+                {analysisResult.isThermostatImage ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-green-800 mb-2">✅ Wires Detected</h4>
-                    <div>
-                      <p className="font-medium text-green-800 mb-2">Detected Wires:</p>
-                      <div className="flex flex-wrap justify-center gap-2">
-                        {analysisResult.detectedWires.map((wire) => (
-                          <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-3 py-1 rounded-full font-medium">
-                            {wire}
-                          </span>
-                        ))}
+                    <h4 className="font-medium text-green-800 mb-3">✅ Thermostat Detected</h4>
+
+                    {analysisResult.detectedTerminals.length > 0 && (
+                      <div className="mb-4">
+                        <h5 className="font-medium text-green-800 mb-2">Select terminals that have wires connected:</h5>
+                        <p className="text-sm text-green-700 mb-3">
+                          We found {analysisResult.detectedTerminals.length} terminals. Check only those with actual
+                          wires attached.
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {analysisResult.detectedTerminals.map((terminal) => {
+                            const connection = analysisResult.wireConnections?.find((c) => c.terminal === terminal)
+                            const isSelected = selectedWires.includes(terminal)
+
+                            return (
+                              <label
+                                key={terminal}
+                                className={`flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                                  isSelected ? "border-[#BAE5D4] bg-green-50" : "border-gray-200 hover:border-gray-300"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleWireToggle(terminal)}
+                                  className="rounded"
+                                />
+                                <div className="flex-1">
+                                  <span className="font-medium text-[#2D2D2D]">{terminal}</span>
+                                  {connection?.wireColor && (
+                                    <span className="text-xs text-gray-600 ml-2">({connection.wireColor} wire?)</span>
+                                  )}
+                                  {connection && (
+                                    <div className={`text-xs ${getConfidenceColor(connection.confidence)}`}>
+                                      {Math.round(connection.confidence * 100)}% confidence
+                                    </div>
+                                  )}
+                                </div>
+                              </label>
+                            )
+                          })}
+                        </div>
+
+                        <div className="mt-3 text-sm text-green-700">
+                          Selected: {selectedWires.length} terminals with wires
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ No Wire Labels Detected</h4>
+                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Unclear Image</h4>
                     <p className="text-yellow-700 text-sm">
-                      We couldn't identify specific wire labels. Try taking a clearer photo or use manual selection.
+                      We couldn't clearly identify this as a thermostat. Try taking a clearer photo or use manual
+                      selection.
                     </p>
                   </div>
                 )}
@@ -270,8 +307,12 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        {analysisResult?.detectedWires.length ? (
-          <InstallButton title="Use Detected Wires" onPress={handleConfirm} disabled={isProcessing} />
+        {analysisResult?.detectedTerminals.length ? (
+          <InstallButton
+            title={`Use Selected Wires (${selectedWires.length})`}
+            onPress={handleConfirm}
+            disabled={isProcessing || selectedWires.length === 0}
+          />
         ) : (
           <InstallButton
             title={previewUrl ? "Continue with Photo" : "Upload Photo"}
