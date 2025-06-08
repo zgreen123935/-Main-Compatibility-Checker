@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { InstallButton } from "./InstallButton"
 import { PhotoGuide } from "./PhotoGuide"
 
@@ -25,6 +25,7 @@ interface AnalysisResult {
   confidence: number
   isThermostatImage: boolean
   reasons: string[]
+  rawAnalysis?: string
 }
 
 export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
@@ -33,7 +34,41 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [selectedWires, setSelectedWires] = useState<string[]>([])
   const [ocrComplete, setOcrComplete] = useState(false)
+  const [showRawAnalysis, setShowRawAnalysis] = useState(false)
+  const [manualMode, setManualMode] = useState(false)
+  const [manualTerminals, setManualTerminals] = useState<string[]>([])
+  const [newTerminal, setNewTerminal] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Common thermostat terminals for manual selection
+  const commonTerminals = [
+    "R",
+    "Rc",
+    "Rh",
+    "C",
+    "Y",
+    "Y1",
+    "Y2",
+    "G",
+    "W",
+    "W1",
+    "W2",
+    "O",
+    "B",
+    "O/B",
+    "ACC+",
+    "ACC-",
+    "AUX",
+    "E",
+    "L",
+    "S",
+  ]
+
+  useEffect(() => {
+    if (analysisResult?.connectedWires) {
+      setSelectedWires(analysisResult.connectedWires)
+    }
+  }, [analysisResult])
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -55,6 +90,7 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     try {
       const formData = new FormData()
       formData.append("image", file)
+      formData.append("mode", showRawAnalysis ? "raw" : "standard")
 
       const response = await fetch("/api/analyze-wiring", {
         method: "POST",
@@ -63,105 +99,24 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
 
       if (response.ok) {
         const result = await response.json()
-        const analysis = {
-          detectedTerminals: result.detectedTerminals || [],
-          wireConnections: result.wireConnections || [],
-          connectedWires: result.connectedWires || [],
-          confidence: result.confidence,
-          isThermostatImage: result.isThermostatImage,
-          reasons: result.reasons || [],
-        }
-        setAnalysisResult(analysis)
-        // Pre-select the detected connected wires
-        setSelectedWires(analysis.connectedWires)
+        setAnalysisResult(result)
       } else {
-        await performClientSideAnalysis(file)
+        throw new Error("Analysis failed")
       }
     } catch (error) {
       console.error("Analysis error:", error)
-      await performClientSideAnalysis(file)
-    } finally {
-      setIsProcessing(false)
-      setOcrComplete(true)
-    }
-  }
-
-  const performClientSideAnalysis = async (file: File) => {
-    try {
-      const { createWorker } = await import("tesseract.js")
-      const worker = await createWorker()
-
-      await worker.setParameters({
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_+",
-        tessedit_pageseg_mode: "6",
-      })
-
-      const { data } = await worker.recognize(file)
-
-      // Simple client-side analysis
-      const terminals = findTerminalLabels(data.text)
-      const analysis = {
-        detectedTerminals: terminals,
-        wireConnections: terminals.map((terminal) => ({
-          terminal,
-          hasWire: true, // Assume all detected terminals have wires for client-side
-          confidence: 0.7,
-        })),
-        connectedWires: terminals,
-        confidence: terminals.length > 0 ? 70 : 30,
-        isThermostatImage: terminals.length > 0,
-        reasons: terminals.length > 0 ? [`Found ${terminals.length} terminals`] : ["No terminals detected"],
-      }
-
-      setAnalysisResult(analysis)
-      setSelectedWires(analysis.connectedWires)
-      await worker.terminate()
-    } catch (error) {
-      console.error("Client-side analysis error:", error)
       setAnalysisResult({
         detectedTerminals: [],
         wireConnections: [],
         connectedWires: [],
         confidence: 0,
         isThermostatImage: false,
-        reasons: ["Analysis failed"],
+        reasons: ["Analysis failed. Please try again or use manual selection."],
       })
+    } finally {
+      setIsProcessing(false)
+      setOcrComplete(true)
     }
-  }
-
-  function findTerminalLabels(text: string): string[] {
-    const normalizedText = text.toUpperCase()
-    const terminals = [
-      "R",
-      "Rh",
-      "Rc",
-      "RH",
-      "RC",
-      "W",
-      "W1",
-      "W2",
-      "Y",
-      "Y1",
-      "Y2",
-      "G",
-      "G1",
-      "C",
-      "COM",
-      "O",
-      "B",
-      "O/B",
-      "AUX",
-      "AUX1",
-      "AUX2",
-      "ACC",
-      "ACC+",
-      "ACC-",
-    ]
-
-    return terminals.filter((terminal) => {
-      const patterns = [new RegExp(`\\b${terminal}\\b`, "g"), new RegExp(`${terminal}\\s*(WIRE|TERMINAL)`, "g")]
-      return patterns.some((pattern) => pattern.test(normalizedText))
-    })
   }
 
   const handleWireToggle = (terminal: string) => {
@@ -185,9 +140,25 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
     return "text-red-600"
   }
 
+  const handleAddManualTerminal = () => {
+    if (newTerminal && !manualTerminals.includes(newTerminal)) {
+      setManualTerminals([...manualTerminals, newTerminal])
+      setSelectedWires([...selectedWires, newTerminal])
+      setNewTerminal("")
+    }
+  }
+
+  const toggleManualMode = () => {
+    setManualMode(!manualMode)
+    if (!manualMode && analysisResult) {
+      // Initialize manual terminals with detected ones
+      setManualTerminals(analysisResult.detectedTerminals)
+    }
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
-      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">Automatic Wire Detection</h3>
+      <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">Wire Detection</h3>
 
       <div className="mb-6">
         <p className="text-[#4B5563] mb-4">
@@ -206,6 +177,18 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
         </div>
 
         <PhotoGuide />
+
+        <div className="flex items-center mb-4">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showRawAnalysis}
+              onChange={() => setShowRawAnalysis(!showRawAnalysis)}
+              className="mr-2"
+            />
+            <span className="text-sm text-[#4B5563]">Show detailed analysis (for troubleshooting)</span>
+          </label>
+        </div>
 
         <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" ref={fileInputRef} />
 
@@ -235,53 +218,131 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
               <div>
                 {analysisResult.isThermostatImage ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-green-800 mb-3">✅ Thermostat Detected</h4>
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-medium text-green-800">✅ Thermostat Detected</h4>
+                      <button
+                        onClick={toggleManualMode}
+                        className="text-sm bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-full transition-colors"
+                      >
+                        {manualMode ? "Use Auto Detection" : "Switch to Manual"}
+                      </button>
+                    </div>
 
-                    {analysisResult.detectedTerminals.length > 0 && (
-                      <div className="mb-4">
-                        <h5 className="font-medium text-green-800 mb-2">Select terminals that have wires connected:</h5>
-                        <p className="text-sm text-green-700 mb-3">
-                          We found {analysisResult.detectedTerminals.length} terminals. Check only those with actual
-                          wires attached.
-                        </p>
+                    {!manualMode ? (
+                      // Automatic detection mode
+                      <div>
+                        {analysisResult.detectedTerminals.length > 0 && (
+                          <div className="mb-4">
+                            <h5 className="font-medium text-green-800 mb-2">
+                              Select terminals that have wires connected:
+                            </h5>
+                            <p className="text-sm text-green-700 mb-3">
+                              We found {analysisResult.detectedTerminals.length} terminals. Check only those with actual
+                              wires attached.
+                            </p>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          {analysisResult.detectedTerminals.map((terminal) => {
-                            const connection = analysisResult.wireConnections?.find((c) => c.terminal === terminal)
-                            const isSelected = selectedWires.includes(terminal)
+                            <div className="grid grid-cols-2 gap-2">
+                              {analysisResult.wireConnections?.map((connection) => {
+                                const isSelected = selectedWires.includes(connection.terminal)
 
-                            return (
-                              <label
-                                key={terminal}
-                                className={`flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
-                                  isSelected ? "border-[#BAE5D4] bg-green-50" : "border-gray-200 hover:border-gray-300"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => handleWireToggle(terminal)}
-                                  className="rounded"
-                                />
-                                <div className="flex-1">
-                                  <span className="font-medium text-[#2D2D2D]">{terminal}</span>
-                                  {connection?.wireColor && (
-                                    <span className="text-xs text-gray-600 ml-2">({connection.wireColor} wire?)</span>
-                                  )}
-                                  {connection && (
-                                    <div className={`text-xs ${getConfidenceColor(connection.confidence)}`}>
-                                      {Math.round(connection.confidence * 100)}% confidence
+                                return (
+                                  <label
+                                    key={connection.terminal}
+                                    className={`flex items-center space-x-2 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? "border-[#BAE5D4] bg-green-50"
+                                        : "border-gray-200 hover:border-gray-300"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={() => handleWireToggle(connection.terminal)}
+                                      className="rounded"
+                                    />
+                                    <div className="flex-1">
+                                      <span className="font-medium text-[#2D2D2D]">{connection.terminal}</span>
+                                      {connection.wireColor && (
+                                        <span className="text-xs text-gray-600 ml-2">
+                                          ({connection.wireColor} wire)
+                                        </span>
+                                      )}
+                                      <div className={`text-xs ${getConfidenceColor(connection.confidence)}`}>
+                                        {Math.round(connection.confidence * 100)}% confidence
+                                      </div>
                                     </div>
-                                  )}
-                                </div>
-                              </label>
-                            )
-                          })}
+                                  </label>
+                                )
+                              })}
+                            </div>
+
+                            <div className="mt-3 text-sm text-green-700">
+                              Selected: {selectedWires.length} terminals with wires
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // Manual selection mode
+                      <div className="mb-4">
+                        <h5 className="font-medium text-green-800 mb-2">Manually select terminals with wires:</h5>
+
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {commonTerminals.map((terminal) => (
+                            <button
+                              key={terminal}
+                              onClick={() => handleWireToggle(terminal)}
+                              className={`px-3 py-1 rounded-full text-sm ${
+                                selectedWires.includes(terminal)
+                                  ? "bg-[#BAE5D4] text-[#2D2D2D]"
+                                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              }`}
+                            >
+                              {terminal}
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={newTerminal}
+                            onChange={(e) => setNewTerminal(e.target.value.toUpperCase())}
+                            placeholder="Custom terminal (e.g. X1)"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                          />
+                          <button
+                            onClick={handleAddManualTerminal}
+                            disabled={!newTerminal}
+                            className="px-3 py-2 bg-[#2D2D2D] text-white rounded-md disabled:bg-gray-400"
+                          >
+                            Add
+                          </button>
                         </div>
 
                         <div className="mt-3 text-sm text-green-700">
                           Selected: {selectedWires.length} terminals with wires
                         </div>
+                      </div>
+                    )}
+
+                    {showRawAnalysis && analysisResult.rawAnalysis && (
+                      <div className="mt-4 p-3 bg-gray-100 rounded-lg">
+                        <h5 className="font-medium text-gray-800 mb-2">Detailed Analysis:</h5>
+                        <pre className="text-xs text-gray-700 whitespace-pre-wrap overflow-auto max-h-60">
+                          {analysisResult.rawAnalysis}
+                        </pre>
+                      </div>
+                    )}
+
+                    {analysisResult.reasons && analysisResult.reasons.length > 0 && (
+                      <div className="mt-4 text-sm text-green-700">
+                        <strong>Analysis notes:</strong>
+                        <ul className="list-disc pl-5 mt-1">
+                          {analysisResult.reasons.map((reason, index) => (
+                            <li key={index}>{reason}</li>
+                          ))}
+                        </ul>
                       </div>
                     )}
                   </div>
@@ -292,6 +353,12 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
                       We couldn't clearly identify this as a thermostat. Try taking a clearer photo or use manual
                       selection.
                     </p>
+                    <button
+                      onClick={toggleManualMode}
+                      className="mt-2 text-sm bg-yellow-200 hover:bg-yellow-300 text-yellow-800 px-3 py-1 rounded-full transition-colors"
+                    >
+                      Switch to Manual Selection
+                    </button>
                   </div>
                 )}
 
@@ -307,7 +374,7 @@ export function WireDetection({ onWiresDetected, onSkip }: WireDetectionProps) {
       </div>
 
       <div className="flex flex-col gap-3">
-        {analysisResult?.detectedTerminals.length ? (
+        {analysisResult?.detectedTerminals.length || manualMode ? (
           <InstallButton
             title={`Use Selected Wires (${selectedWires.length})`}
             onPress={handleConfirm}
