@@ -13,6 +13,26 @@ interface AnalysisResult {
   detectedWires: string[]
   confidence: number
   reasons: string[]
+  wireConnections?: { terminal: string; hasWire: boolean; confidence: number; wireColor?: string }[]
+  connectedWires: any
+}
+
+const getWireColorHex = (color: string): string => {
+  const colorMap: Record<string, string> = {
+    red: "#dc2626",
+    blue: "#2563eb",
+    yellow: "#eab308",
+    green: "#16a34a",
+    white: "#6b7280",
+    orange: "#ea580c",
+    black: "#1f2937",
+    gray: "#6b7280",
+    grey: "#6b7280",
+    brown: "#92400e",
+    purple: "#7c3aed",
+    pink: "#db2777",
+  }
+  return colorMap[color.toLowerCase()] || "#6b7280"
 }
 
 export function UploadPhoto() {
@@ -61,6 +81,8 @@ export function UploadPhoto() {
           detectedWires: result.detectedWires || [],
           confidence: result.confidence,
           reasons: result.reasons || [],
+          wireConnections: result.wireConnections,
+          connectedWires: result.wireConnections?.filter((conn: any) => conn.hasWire && conn.confidence > 0.5) || [],
         })
       } else {
         // Fallback to client-side analysis if API fails
@@ -100,6 +122,7 @@ export function UploadPhoto() {
         detectedWires: [],
         confidence: 0,
         reasons: ["Analysis failed - please use manual selection"],
+        connectedWires: [],
       })
     }
   }
@@ -261,6 +284,7 @@ export function UploadPhoto() {
       detectedWires,
       confidence,
       reasons,
+      connectedWires: [],
     }
   }
 
@@ -360,6 +384,40 @@ export function UploadPhoto() {
                             {analysisResult.systemType === "heat-pump" ? "heat pump" : "conventional"} system. Is this
                             correct?
                           </p>
+                          {analysisResult.connectedWires.length > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                              <h3 className="font-medium text-blue-800 mb-3">🔌 Detected Wire Connections:</h3>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {analysisResult.wireConnections
+                                  ?.filter((conn) => conn.hasWire && conn.confidence > 0.5)
+                                  ?.map((conn) => (
+                                    <div
+                                      key={conn.terminal}
+                                      className="flex items-center justify-between bg-white rounded p-2 border"
+                                    >
+                                      <div className="flex items-center">
+                                        <span className="font-semibold text-blue-900 mr-2">{conn.terminal}</span>
+                                        {conn.wireColor && (
+                                          <span
+                                            className="text-xs px-2 py-1 rounded-full text-white font-medium"
+                                            style={{ backgroundColor: getWireColorHex(conn.wireColor) }}
+                                          >
+                                            {conn.wireColor}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-xs text-gray-600">
+                                        {Math.round(conn.confidence * 100)}%
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                              <p className="text-sm text-blue-700 mt-3">
+                                Found {analysisResult.connectedWires.length} wire connections. These will be
+                                pre-selected in the next step.
+                              </p>
+                            </div>
+                          )}
                           <div className="flex justify-center gap-3">
                             <button
                               onClick={() => handleSystemConfirmation(analysisResult.systemType === "heat-pump")}
