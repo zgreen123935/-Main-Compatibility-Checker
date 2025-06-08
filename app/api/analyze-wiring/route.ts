@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createWorker } from "tesseract.js"
+import type { File } from "formdata-node"
 
 interface WireConnection {
   terminal: string
@@ -36,461 +36,190 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File size must be less than 5MB" }, { status: 400 })
     }
 
+    // Convert image to base64
     const buffer = Buffer.from(await file.arrayBuffer())
+    const base64Image = buffer.toString("base64")
+    const mimeType = file.type
 
-    // Initialize Tesseract.js worker
-    const worker = await createWorker()
-
-    await worker.setParameters({
-      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_+",
-      tessedit_pageseg_mode: "6",
-      tessjs_create_hocr: "1",
-      tessjs_create_tsv: "1",
-      tessedit_ocr_engine_mode: "1",
-    })
-
-    const { data } = await worker.recognize(buffer)
-
-    // Try different segmentation modes for better detection
-    await worker.setParameters({ tessedit_pageseg_mode: "8" })
-    const { data: data2 } = await worker.recognize(buffer)
-
-    await worker.setParameters({ tessedit_pageseg_mode: "7" })
-    const { data: data3 } = await worker.recognize(buffer)
-
-    const combinedText = `${data.text} ${data2.text} ${data3.text}`
-    const avgConfidence = (data.confidence + data2.confidence + data3.confidence) / 3
-
-    // Analyze the image for terminals and wire connections with strict filtering
-    const analysis = performPreciseWireAnalysis(combinedText, avgConfidence, data.hocr, data.tsv)
-
-    await worker.terminate()
+    // Use OpenAI Vision API for much better analysis
+    const analysis = await analyzeWithOpenAIVision(base64Image, mimeType)
 
     return NextResponse.json({
       success: true,
       ...analysis,
-      rawText: combinedText,
-      ocrConfidence: avgConfidence,
     })
   } catch (error) {
     console.error("Error processing image:", error)
-    return NextResponse.json({ error: "Failed to process image" }, { status: 500 })
+
+    // Fallback to Tesseract if OpenAI fails
+    const file = req.formData().get("image") as File // Declare file variable here
+    try {
+      const fallbackAnalysis = await fallbackToTesseract(await file.arrayBuffer())
+      return NextResponse.json({
+        success: true,
+        ...fallbackAnalysis,
+        fallbackUsed: true,
+      })
+    } catch (fallbackError) {
+      console.error("Fallback analysis also failed:", fallbackError)
+      return NextResponse.json({ error: "Failed to process image" }, { status: 500 })
+    }
   }
 }
 
-function performPreciseWireAnalysis(text: string, ocrConfidence: number, hocr?: string, tsv?: string): ImageAnalysis {
-  const normalizedText = text.toUpperCase()
-  const reasons: string[] = []
-  const suggestions: string[] = []
+async function analyzeWithOpenAIVision(base64Image: string, mimeType: string): Promise<ImageAnalysis> {
+  const openaiApiKey = process.env.OPENAI_API_KEY
 
-  // STRICT terminal labels - only actual terminal designations
-  const validTerminalLabels = [
-    // Power terminals
-    "R",
-    "RH",
-    "RC",
-    "24V",
-    // Heating terminals
-    "W",
-    "W1",
-    "W2",
-    "W3",
-    "AUX",
-    "AUX1",
-    "AUX2",
-    "E",
-    "EM",
-    // Cooling terminals
-    "Y",
-    "Y1",
-    "Y2",
-    "Y3",
-    // Fan terminals
-    "G",
-    "G1",
-    "G2",
-    // Common terminals
-    "C",
-    "COM",
-    // Heat pump terminals
-    "O",
-    "B",
-    "O/B",
-    "OB",
-    // Accessory terminals
-    "ACC",
-    "ACC+",
-    "ACC-",
-    "ACCP",
-    "ACCM",
-    // Humidity/Dehumidification
-    "HUM",
-    "DEHUM",
-    "HUMID",
-  ]
-
-  // Words that are NOT terminal labels (descriptive text to exclude)
-  const excludeWords = [
-    "HEAT",
-    "COOL",
-    "FAN",
-    "BLOWER",
-    "CONTACTOR",
-    "REVERSING",
-    "VALVE",
-    "MODE",
-    "ELECTRIC",
-    "STRIPS",
-    "DEHUMIDIFICATION",
-    "COMMON",
-    "POWER",
-    "WIRE",
-    "WIRING",
-    "TERMINAL",
-    "THERMOSTAT",
-    "HVAC",
-    "SYSTEM",
-    "CONTROL",
-    "TEMPERATURE",
-    "AIR",
-    "CONDITIONING",
-    "FURNACE",
-    "PUMP",
-    "HEATING",
-    "COOLING",
-    "24VAC",
-    "VOLTAGE",
-    "SUPPLY",
-    "RETURN",
-    "INDOOR",
-    "OUTDOOR",
-  ]
-
-  // Detect terminals with very strict filtering
-  const detectedTerminals = findPreciseTerminalLabels(text, validTerminalLabels, excludeWords)
-
-  // Analyze wire connections using enhanced heuristics
-  const wireConnections = analyzeWireConnectionsPrecise(detectedTerminals, text, hocr)
-
-  // Extract only terminals with moderate confidence wire connections
-  const connectedWires = wireConnections
-    .filter((connection) => connection.hasWire && connection.confidence > 0.4) // Lowered from 0.5 to 0.4
-    .map((connection) => connection.terminal)
-
-  // Thermostat validation
-  const thermostatKeywords = ["THERMOSTAT", "HVAC", "REVERSING", "VALVE", "24V", "HEAT", "COOL"]
-
-  const hasThermostatKeywords = thermostatKeywords.some((keyword) => normalizedText.includes(keyword))
-
-  // Calculate confidence with better balance
-  let confidence = 0
-
-  if (detectedTerminals.length >= 10) {
-    confidence += 50
-    reasons.push(`Found ${detectedTerminals.length} terminal labels`)
-  } else if (detectedTerminals.length >= 7) {
-    confidence += 40
-    reasons.push(`Found ${detectedTerminals.length} terminal labels`)
-  } else if (detectedTerminals.length >= 5) {
-    confidence += 30
-    reasons.push(`Found ${detectedTerminals.length} terminal labels`)
-  } else if (detectedTerminals.length >= 3) {
-    confidence += 20
-    reasons.push(`Found ${detectedTerminals.length} terminal labels`)
+  if (!openaiApiKey) {
+    throw new Error("OpenAI API key not configured")
   }
 
-  if (connectedWires.length >= 6) {
-    confidence += 40
-    reasons.push(`Detected ${connectedWires.length} wire connections`)
-  } else if (connectedWires.length >= 4) {
-    confidence += 30
-    reasons.push(`Detected ${connectedWires.length} wire connections`)
-  } else if (connectedWires.length >= 2) {
-    confidence += 20
-    reasons.push(`Detected ${connectedWires.length} wire connections`)
+  const prompt = `Analyze this thermostat wiring image and provide a detailed analysis. I need you to:
+
+1. Identify ALL terminal labels visible (like R, RH, RC, C, Y, Y1, Y2, G, W, W1, W2, O, B, O/B, ACC+, ACC-, AUX1, AUX2, etc.)
+2. For EACH terminal, determine if there is actually a wire connected to it
+3. If there's a wire, try to identify the wire color
+4. Determine if this is a heat pump system (look for O, B, or O/B terminals and "reversing valve" text)
+5. Assess overall confidence that this is a thermostat wiring image
+
+Please respond in this exact JSON format:
+{
+  "detectedTerminals": ["R", "C", "Y1", "G", "W1", "O/B", "Y2", "W2", "ACC+", "ACC-", "AUX1"],
+  "wireConnections": [
+    {"terminal": "R", "hasWire": true, "wireColor": "red", "confidence": 0.9},
+    {"terminal": "C", "hasWire": true, "wireColor": "blue", "confidence": 0.85},
+    {"terminal": "Y1", "hasWire": true, "wireColor": "yellow", "confidence": 0.9},
+    {"terminal": "G", "hasWire": true, "wireColor": "green", "confidence": 0.9},
+    {"terminal": "W1", "hasWire": true, "wireColor": "white", "confidence": 0.85},
+    {"terminal": "O/B", "hasWire": true, "wireColor": "orange", "confidence": 0.8},
+    {"terminal": "Y2", "hasWire": false, "confidence": 0.3},
+    {"terminal": "W2", "hasWire": true, "wireColor": "gray", "confidence": 0.7},
+    {"terminal": "ACC+", "hasWire": false, "confidence": 0.2},
+    {"terminal": "ACC-", "hasWire": false, "confidence": 0.2}
+  ],
+  "systemType": "heat-pump",
+  "confidence": 95,
+  "isThermostatImage": true,
+  "reasons": ["Clear terminal labels visible", "Multiple wire connections detected", "Heat pump indicators present"],
+  "suggestions": ["All terminals clearly visible", "Wire connections are obvious"]
+}
+
+Focus on accuracy - only mark hasWire as true if you can clearly see a wire connected to that specific terminal.`
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${openaiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: prompt,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${mimeType};base64,${base64Image}`,
+                detail: "high",
+              },
+            },
+          ],
+        },
+      ],
+      max_tokens: 1000,
+      temperature: 0.1, // Low temperature for consistent analysis
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`OpenAI API error: ${response.status}`)
   }
 
-  if (hasThermostatKeywords) {
-    confidence += 20
-    reasons.push("Contains thermostat-related text")
+  const data = await response.json()
+  const content = data.choices[0]?.message?.content
+
+  if (!content) {
+    throw new Error("No response from OpenAI")
   }
 
-  // Heat pump specific patterns
-  const heatPumpPatterns = [/reversing\s+valve/i, /o\/b/i, /heat\s+pump/i, /cool\s+mode/i]
+  try {
+    // Extract JSON from the response
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error("No JSON found in OpenAI response")
+    }
 
-  if (heatPumpPatterns.some((pattern) => pattern.test(text))) {
-    confidence += 15
-    reasons.push("Found heat pump indicators")
+    const analysisData = JSON.parse(jsonMatch[0])
+
+    // Extract connected wires from wire connections
+    const connectedWires =
+      analysisData.wireConnections
+        ?.filter((conn: WireConnection) => conn.hasWire && conn.confidence > 0.5)
+        ?.map((conn: WireConnection) => conn.terminal) || []
+
+    return {
+      detectedTerminals: analysisData.detectedTerminals || [],
+      wireConnections: analysisData.wireConnections || [],
+      connectedWires,
+      systemType: analysisData.systemType || "unknown",
+      confidence: analysisData.confidence || 0,
+      isThermostatImage: analysisData.isThermostatImage || false,
+      reasons: analysisData.reasons || [],
+      suggestions: analysisData.suggestions || [],
+    }
+  } catch (parseError) {
+    console.error("Failed to parse OpenAI response:", parseError)
+    console.error("Raw response:", content)
+    throw new Error("Failed to parse analysis results")
   }
+}
 
-  confidence = Math.max(0, Math.min(100, confidence))
+async function fallbackToTesseract(buffer: ArrayBuffer): Promise<ImageAnalysis> {
+  // Import Tesseract dynamically
+  const { createWorker } = await import("tesseract.js")
+  const worker = await createWorker()
 
-  const isThermostatImage = confidence >= 30 || detectedTerminals.length >= 4
+  await worker.setParameters({
+    tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_+",
+    tessedit_pageseg_mode: "6",
+  })
 
-  // System type analysis
-  const systemType = analyzeSystemTypeAdvanced(connectedWires, text)
+  const { data } = await worker.recognize(Buffer.from(buffer))
+  await worker.terminate()
 
-  // Add suggestions
-  if (!isThermostatImage) {
-    suggestions.push("Make sure wire terminal labels are clearly visible")
-    suggestions.push("Remove any thermostat cover to expose the wiring terminals")
-  }
+  // Simple fallback analysis
+  const text = data.text.toUpperCase()
+  const terminals = ["R", "RH", "RC", "C", "Y", "Y1", "Y2", "G", "W", "W1", "W2", "O", "B", "O/B", "ACC+", "ACC-"]
 
-  if (detectedTerminals.length > 15) {
-    suggestions.push("Too many terminals detected - may be picking up descriptive text")
-  }
+  const detectedTerminals = terminals.filter((terminal) => {
+    const regex = new RegExp(`\\b${terminal.replace("/", "\\/")}\\b`)
+    return regex.test(text)
+  })
+
+  const wireConnections = detectedTerminals.map((terminal) => ({
+    terminal,
+    hasWire: true, // Assume detected terminals have wires in fallback
+    confidence: 0.6,
+  }))
+
+  const connectedWires = detectedTerminals
+
+  const isHeatPump = text.includes("O/B") || text.includes("REVERSING") || text.includes("HEAT PUMP")
 
   return {
     detectedTerminals,
     wireConnections,
     connectedWires,
-    systemType,
-    confidence,
-    isThermostatImage,
-    reasons,
-    suggestions,
+    systemType: isHeatPump ? "heat-pump" : "conventional",
+    confidence: detectedTerminals.length > 0 ? 70 : 30,
+    isThermostatImage: detectedTerminals.length > 0,
+    reasons: [`Fallback analysis - found ${detectedTerminals.length} terminals`],
+    suggestions: ["Consider retaking photo for better analysis"],
   }
-}
-
-function findPreciseTerminalLabels(text: string, validLabels: string[], excludeWords: string[]): string[] {
-  const normalizedText = text.toUpperCase()
-  const foundLabels: string[] = []
-
-  validLabels.forEach((label) => {
-    // Skip if this label is actually an excluded descriptive word
-    if (excludeWords.includes(label)) {
-      return
-    }
-
-    // More balanced pattern matching - not too strict, not too loose
-    const balancedPatterns = [
-      // Exact word boundaries with some flexibility
-      new RegExp(`\\b${label}\\b(?!\\s+(STRIPS|MODE|VALVE|CONTACTOR|BLOWER))`, "g"),
-      // Terminal with number (like Y1, W2, AUX1)
-      new RegExp(`\\b${label}\\d+\\b`, "g"),
-      // Terminal with +/- (like ACC+, ACC-)
-      new RegExp(`\\b${label}[\\+\\-]\\b`, "g"),
-      // Combined terminals (like O/B)
-      ...(label.includes("/") ? [new RegExp(`\\b${label.replace("/", "\\/")}\\b`, "g")] : []),
-      // Allow some common variations
-      ...(label === "C" ? [/\bCOM\b/g, /\bCOMMON\b(?!\s+(WIRE|TERMINAL))/g] : []),
-      ...(label === "AUX1" ? [/\bW1\s*\$$\s*AUX1?\s*\$$/g] : []),
-      ...(label === "AUX2" ? [/\bW2\s*\$$\s*AUX2?\s*\$$/g] : []),
-    ]
-
-    // Check if any pattern matches
-    const hasMatch = balancedPatterns.some((pattern) => {
-      const matches = normalizedText.match(pattern)
-      if (!matches) return false
-
-      // For each match, do lighter context checking
-      return matches.some((match) => {
-        const matchIndex = normalizedText.indexOf(match)
-        const beforeText = normalizedText.substring(Math.max(0, matchIndex - 15), matchIndex)
-        const afterText = normalizedText.substring(matchIndex + match.length, matchIndex + match.length + 15)
-
-        // Only exclude if it's clearly part of a descriptive phrase
-        const isDescriptivePhrase =
-          (beforeText.includes("ELECTRIC") && afterText.includes("STRIPS")) ||
-          (beforeText.includes("REVERSING") && afterText.includes("VALVE")) ||
-          (beforeText.includes("24V") && afterText.includes("HEAT")) ||
-          (match === "COMMON" && (beforeText.includes("24V") || afterText.includes("WIRE")))
-
-        return !isDescriptivePhrase
-      })
-    })
-
-    if (hasMatch) {
-      foundLabels.push(label)
-    }
-  })
-
-  // Special handling for combined and variant labels
-  if ((normalizedText.includes("O/B") || normalizedText.includes("OB")) && !foundLabels.includes("O/B")) {
-    foundLabels.push("O/B")
-  }
-
-  // Handle AUX variations
-  if (normalizedText.includes("AUX1") && !foundLabels.includes("AUX1")) {
-    foundLabels.push("AUX1")
-  }
-  if (normalizedText.includes("AUX2") && !foundLabels.includes("AUX2")) {
-    foundLabels.push("AUX2")
-  }
-
-  // Remove duplicates and sort by common terminal priority
-  const uniqueLabels = [...new Set(foundLabels)]
-
-  // Prioritize common terminals
-  const commonTerminals = [
-    "R",
-    "RH",
-    "RC",
-    "C",
-    "Y",
-    "Y1",
-    "Y2",
-    "G",
-    "W",
-    "W1",
-    "W2",
-    "O",
-    "B",
-    "O/B",
-    "ACC+",
-    "ACC-",
-    "AUX1",
-    "AUX2",
-  ]
-  const sortedLabels = uniqueLabels.sort((a, b) => {
-    const aIndex = commonTerminals.indexOf(a)
-    const bIndex = commonTerminals.indexOf(b)
-    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
-    if (aIndex !== -1) return -1
-    if (bIndex !== -1) return 1
-    return a.localeCompare(b)
-  })
-
-  return sortedLabels
-}
-
-function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?: string): WireConnection[] {
-  const wireConnections: WireConnection[] = []
-  const normalizedText = text.toUpperCase()
-
-  // Enhanced wire-to-terminal associations with more confident detection
-  const wireAssociations = [
-    { terminals: ["R", "RH", "RC"], colors: ["red"], confidence: 0.9, essential: true },
-    { terminals: ["C", "COM"], colors: ["blue", "black"], confidence: 0.85, essential: true },
-    { terminals: ["Y", "Y1"], colors: ["yellow"], confidence: 0.9, essential: true },
-    { terminals: ["G", "G1"], colors: ["green"], confidence: 0.9, essential: true },
-    { terminals: ["W", "W1", "AUX1"], colors: ["white"], confidence: 0.85, essential: true },
-    { terminals: ["O", "O/B"], colors: ["orange"], confidence: 0.8, essential: true }, // Changed to essential for heat pumps
-    { terminals: ["Y2"], colors: ["yellow"], confidence: 0.75, essential: false },
-    { terminals: ["W2", "AUX2"], colors: ["white", "gray"], confidence: 0.75, essential: false },
-    { terminals: ["B"], colors: ["blue"], confidence: 0.7, essential: false },
-    { terminals: ["ACC+", "ACC-"], colors: ["gray", "brown", "black"], confidence: 0.65, essential: false }, // Increased confidence
-  ]
-
-  // Check for wire color mentions in text
-  const wireColorMentions = {
-    red: /red/i.test(text),
-    blue: /blue/i.test(text),
-    yellow: /yellow/i.test(text),
-    green: /green/i.test(text),
-    white: /white/i.test(text),
-    orange: /orange/i.test(text),
-    gray: /(gray|grey)/i.test(text),
-    brown: /brown/i.test(text),
-    black: /black/i.test(text),
-  }
-
-  // Count total color mentions to estimate wire count
-  const colorMentionCount = Object.values(wireColorMentions).filter(Boolean).length
-
-  // If we detect many terminals, assume most common ones have wires
-  const assumeWiresForCommonTerminals = terminals.length >= 8
-
-  terminals.forEach((terminal) => {
-    let hasWire = false
-    let wireColor: string | undefined
-    let confidence = 0.4 // Moderate default confidence
-
-    // Find association for this terminal
-    const association = wireAssociations.find((assoc) =>
-      assoc.terminals.some((t) => terminal === t || terminal.includes(t) || t.includes(terminal)),
-    )
-
-    if (association) {
-      // Essential terminals are very likely to have wires
-      if (association.essential) {
-        hasWire = true
-        confidence = association.confidence
-
-        // If we have many terminals detected, be even more confident about essential ones
-        if (assumeWiresForCommonTerminals) {
-          confidence = Math.min(0.95, confidence + 0.1)
-        }
-      } else {
-        // Optional terminals - moderate likelihood, but still assume they have wires if detected
-        hasWire = true
-        confidence = association.confidence
-      }
-
-      // Check for wire color mentions
-      if (association.colors.length > 0) {
-        const mentionedColor = association.colors.find(
-          (color) => wireColorMentions[color as keyof typeof wireColorMentions],
-        )
-
-        if (mentionedColor) {
-          hasWire = true
-          wireColor = mentionedColor
-          confidence = Math.min(0.95, confidence + 0.15)
-        }
-      }
-    } else {
-      // Even if no association found, if it's a valid terminal, assume it might have a wire
-      hasWire = true
-      confidence = 0.6
-    }
-
-    // Special logic for specific terminals
-    if (terminal === "O/B" && (normalizedText.includes("REVERSING") || normalizedText.includes("HEAT PUMP"))) {
-      hasWire = true
-      confidence = Math.max(confidence, 0.85)
-    }
-
-    // If we have many color mentions, be more generous with wire detection
-    if (colorMentionCount >= 5 && confidence > 0.4) {
-      hasWire = true
-      confidence = Math.max(confidence, 0.7)
-    }
-
-    // Boost confidence for common terminal patterns
-    const commonTerminalPatterns = ["R", "C", "Y", "G", "W", "O", "ACC"]
-    if (commonTerminalPatterns.some((pattern) => terminal.includes(pattern))) {
-      confidence = Math.max(confidence, 0.65)
-    }
-
-    wireConnections.push({
-      terminal,
-      hasWire,
-      wireColor,
-      confidence,
-    })
-  })
-
-  return wireConnections
-}
-
-function analyzeSystemTypeAdvanced(connectedWires: string[], text: string): "heat-pump" | "conventional" | "unknown" {
-  const normalizedText = text.toUpperCase()
-
-  // Heat pump indicators
-  const heatPumpIndicators = [
-    connectedWires.includes("O") || connectedWires.includes("B") || connectedWires.includes("O/B"),
-    normalizedText.includes("REVERSING"),
-    normalizedText.includes("HEAT PUMP"),
-    normalizedText.includes("COOL MODE"),
-    normalizedText.includes("O/B"),
-  ]
-
-  if (heatPumpIndicators.some((indicator) => indicator)) {
-    return "heat-pump"
-  }
-
-  // Conventional system indicators
-  const conventionalIndicators = [
-    (connectedWires.includes("W") || connectedWires.includes("W1")) &&
-      !connectedWires.includes("O") &&
-      !connectedWires.includes("B") &&
-      !normalizedText.includes("HEAT PUMP"),
-  ]
-
-  if (conventionalIndicators.some((indicator) => indicator)) {
-    return "conventional"
-  }
-
-  return "unknown"
 }
