@@ -174,7 +174,7 @@ function performPreciseWireAnalysis(text: string, ocrConfidence: number, hocr?: 
 
   // Extract only terminals with moderate confidence wire connections
   const connectedWires = wireConnections
-    .filter((connection) => connection.hasWire && connection.confidence > 0.5) // Lowered from 0.6
+    .filter((connection) => connection.hasWire && connection.confidence > 0.4) // Lowered from 0.5 to 0.4
     .map((connection) => connection.terminal)
 
   // Thermostat validation
@@ -358,18 +358,18 @@ function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?:
   const wireConnections: WireConnection[] = []
   const normalizedText = text.toUpperCase()
 
-  // Enhanced wire-to-terminal associations
+  // Enhanced wire-to-terminal associations with more confident detection
   const wireAssociations = [
     { terminals: ["R", "RH", "RC"], colors: ["red"], confidence: 0.9, essential: true },
     { terminals: ["C", "COM"], colors: ["blue", "black"], confidence: 0.85, essential: true },
     { terminals: ["Y", "Y1"], colors: ["yellow"], confidence: 0.9, essential: true },
     { terminals: ["G", "G1"], colors: ["green"], confidence: 0.9, essential: true },
     { terminals: ["W", "W1", "AUX1"], colors: ["white"], confidence: 0.85, essential: true },
-    { terminals: ["O", "O/B"], colors: ["orange"], confidence: 0.8, essential: false },
+    { terminals: ["O", "O/B"], colors: ["orange"], confidence: 0.8, essential: true }, // Changed to essential for heat pumps
     { terminals: ["Y2"], colors: ["yellow"], confidence: 0.75, essential: false },
     { terminals: ["W2", "AUX2"], colors: ["white", "gray"], confidence: 0.75, essential: false },
     { terminals: ["B"], colors: ["blue"], confidence: 0.7, essential: false },
-    { terminals: ["ACC+", "ACC-"], colors: ["gray", "brown", "black"], confidence: 0.6, essential: false },
+    { terminals: ["ACC+", "ACC-"], colors: ["gray", "brown", "black"], confidence: 0.65, essential: false }, // Increased confidence
   ]
 
   // Check for wire color mentions in text
@@ -388,6 +388,9 @@ function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?:
   // Count total color mentions to estimate wire count
   const colorMentionCount = Object.values(wireColorMentions).filter(Boolean).length
 
+  // If we detect many terminals, assume most common ones have wires
+  const assumeWiresForCommonTerminals = terminals.length >= 8
+
   terminals.forEach((terminal) => {
     let hasWire = false
     let wireColor: string | undefined
@@ -403,10 +406,15 @@ function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?:
       if (association.essential) {
         hasWire = true
         confidence = association.confidence
+
+        // If we have many terminals detected, be even more confident about essential ones
+        if (assumeWiresForCommonTerminals) {
+          confidence = Math.min(0.95, confidence + 0.1)
+        }
       } else {
-        // Optional terminals - moderate likelihood
+        // Optional terminals - moderate likelihood, but still assume they have wires if detected
         hasWire = true
-        confidence = association.confidence * 0.8
+        confidence = association.confidence
       }
 
       // Check for wire color mentions
@@ -421,17 +429,28 @@ function analyzeWireConnectionsPrecise(terminals: string[], text: string, hocr?:
           confidence = Math.min(0.95, confidence + 0.15)
         }
       }
+    } else {
+      // Even if no association found, if it's a valid terminal, assume it might have a wire
+      hasWire = true
+      confidence = 0.6
     }
 
     // Special logic for specific terminals
     if (terminal === "O/B" && (normalizedText.includes("REVERSING") || normalizedText.includes("HEAT PUMP"))) {
       hasWire = true
-      confidence = Math.max(confidence, 0.8)
+      confidence = Math.max(confidence, 0.85)
     }
 
     // If we have many color mentions, be more generous with wire detection
-    if (colorMentionCount >= 5 && confidence > 0.5) {
+    if (colorMentionCount >= 5 && confidence > 0.4) {
       hasWire = true
+      confidence = Math.max(confidence, 0.7)
+    }
+
+    // Boost confidence for common terminal patterns
+    const commonTerminalPatterns = ["R", "C", "Y", "G", "W", "O", "ACC"]
+    if (commonTerminalPatterns.some((pattern) => terminal.includes(pattern))) {
+      confidence = Math.max(confidence, 0.65)
     }
 
     wireConnections.push({
