@@ -82,18 +82,18 @@ export function UploadPhoto() {
       const worker = await createWorker()
 
       await worker.setParameters({
-        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_",
-        tessedit_pageseg_mode: "6", // Assume a single uniform block of text
+        tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789*/()[]{}.,:-_+",
+        tessedit_pageseg_mode: "6",
+        tessedit_ocr_engine_mode: "1",
       })
 
       const { data } = await worker.recognize(file)
-      const result = analyzeImageContent(data.text, data.confidence)
+      const result = analyzeImageContentAdvanced(data.text, data.confidence)
       setAnalysisResult(result)
 
       await worker.terminate()
     } catch (error) {
       console.error("Client-side analysis error:", error)
-      // Set a default "unknown" result if analysis fails
       setAnalysisResult({
         isThermostatImage: false,
         systemType: "unknown",
@@ -104,43 +104,72 @@ export function UploadPhoto() {
     }
   }
 
-  const analyzeImageContent = (text: string, ocrConfidence: number): AnalysisResult => {
+  const analyzeImageContentAdvanced = (text: string, ocrConfidence: number): AnalysisResult => {
     const normalizedText = text.toUpperCase()
     const reasons: string[] = []
 
-    // Thermostat wire labels - expanded to include more variations
+    // Comprehensive thermostat wire labels
     const thermostatWireLabels = [
       "R",
       "Rh",
       "Rc",
+      "RH",
+      "RC",
       "W",
       "W1",
       "W2",
+      "W3",
       "Y",
       "Y1",
       "Y2",
+      "Y3",
       "G",
       "G1",
+      "G2",
       "C",
-      "O",
-      "B",
-      "E",
-      "AUX",
       "COM",
       "COMMON",
+      "O",
+      "B",
+      "O/B",
+      "OB",
+      "E",
+      "AUX",
+      "AUX1",
+      "AUX2",
+      "ACC",
+      "ACC+",
+      "ACC-",
+      "ACCP",
+      "ACCM",
+      "DEHUM",
+      "HUM",
+      "HUMID",
+      "24V",
+      "24VAC",
+      "PWR",
+      "POWER",
       "HEAT",
       "COOL",
       "FAN",
-      "PWR",
-      "POWER",
-      "24V",
-      "24VAC",
+      "HP",
+      "HEATPUMP",
+      "REV",
+      "REVERSE",
+      "EM",
+      "EMHEAT",
+      "EMERGENCY",
+      "BLOWER",
+      "CONTACTOR",
+      "SENSOR",
+      "TEMP",
+      "TEMPERATURE",
     ]
 
-    // Find wire labels with more flexible matching
-    const detectedWires = findWireLabelsEnhanced(text, thermostatWireLabels)
+    // Enhanced wire detection
+    const detectedWires = findWireLabelsAdvanced(text, thermostatWireLabels)
 
-    // Thermostat indicators - expanded list
+    // Thermostat indicators
     const thermostatKeywords = [
       "THERMOSTAT",
       "HVAC",
@@ -157,135 +186,69 @@ export function UploadPhoto() {
       "SYSTEM",
       "CONTROL",
       "TEMPERATURE",
-      "HONEYWELL",
-      "NEST",
-      "ECOBEE",
-      "MYSA",
-      "EMERSON",
-      "CARRIER",
-      "TRANE",
+      "BLOWER",
+      "CONTACTOR",
+      "REVERSING",
+      "VALVE",
+      "DEHUMIDIFICATION",
+      "ELECTRIC",
+      "STRIPS",
+      "COMMON",
+      "24V",
+      "MODE",
     ]
     const hasThermostatKeywords = thermostatKeywords.some((keyword) => normalizedText.includes(keyword))
-
-    // Non-thermostat indicators
-    const nonThermostatKeywords = [
-      "SPREADSHEET",
-      "EXCEL",
-      "TABLE",
-      "CHART",
-      "GRAPH",
-      "DOCUMENT",
-      "PDF",
-      "INVOICE",
-      "RECEIPT",
-      "MENU",
-      "PRICE",
-      "COST",
-      "TOTAL",
-      "SUM",
-      "AMOUNT",
-      "EMAIL",
-      "MESSAGE",
-      "TEXT",
-      "PARAGRAPH",
-      "ARTICLE",
-      "BOOK",
-      "PAGE",
-      "CELL",
-      "ROW",
-      "COLUMN",
-      "FORMULA",
-      "FUNCTION",
-      "DATA",
-      "REPORT",
-      "FEATURE",
-      "CATEGORY",
-      "HARDWARE",
-      "SOFTWARE",
-      "COMPATIBILITY",
-    ]
-    const hasNonThermostatKeywords = nonThermostatKeywords.some((keyword) => normalizedText.includes(keyword))
 
     // Calculate confidence
     let confidence = 0
 
-    // Wire label analysis - more weight on this
-    if (detectedWires.length >= 3) {
-      confidence += 60
+    if (detectedWires.length >= 5) {
+      confidence += 70
       reasons.push(`Found ${detectedWires.length} wire labels`)
-    } else if (detectedWires.length === 2) {
-      confidence += 40
+    } else if (detectedWires.length >= 3) {
+      confidence += 50
+      reasons.push(`Found ${detectedWires.length} wire labels`)
+    } else if (detectedWires.length >= 2) {
+      confidence += 30
       reasons.push(`Found ${detectedWires.length} wire labels`)
     } else if (detectedWires.length === 1) {
-      confidence += 20
+      confidence += 15
       reasons.push("Found 1 wire label")
     }
 
-    // Keyword analysis
     if (hasThermostatKeywords) {
-      confidence += 25
+      confidence += 20
       reasons.push("Contains thermostat-related text")
     }
 
-    if (hasNonThermostatKeywords) {
-      confidence -= 40
-      reasons.push("Contains non-thermostat content")
-    }
-
-    // Text pattern analysis - look for common thermostat wiring patterns
-    const wirePatterns = [
-      /[RWYGOBC]\d*\s*[-:→]\s*[A-Z]/i, // R -> Y pattern
-      /[RWYGOBC]\d*\s*terminal/i, // R terminal pattern
-      /terminal\s*[RWYGOBC]\d*/i, // terminal R pattern
-      /[RWYGOBC]\d*\s*wire/i, // R wire pattern
-      /wire\s*[RWYGOBC]\d*/i, // wire R pattern
+    // Modern thermostat patterns
+    const modernPatterns = [
+      /reversing\s+valve/i,
+      /24v\s+heat/i,
+      /electric\s+heat\s+strips/i,
+      /dehumidification/i,
+      /blower.*contactor/i,
     ]
 
-    const hasWirePattern = wirePatterns.some((pattern) => pattern.test(text))
-    if (hasWirePattern) {
-      confidence += 25
-      reasons.push("Found wire connection patterns")
+    if (modernPatterns.some((pattern) => pattern.test(text))) {
+      confidence += 30
+      reasons.push("Found modern thermostat patterns")
     }
 
-    // Visual analysis - look for terminal-like layout
-    const hasTerminalLayout =
-      /[RWYGOBC]\s+[RWYGOBC]\s+[RWYGOBC]/i.test(text) || /[RWYGOBC]\n[RWYGOBC]\n[RWYGOBC]/i.test(text)
-    if (hasTerminalLayout) {
-      confidence += 20
-      reasons.push("Found terminal-like layout")
-    }
-
-    // Text density analysis - relaxed for real thermostats which may have instructions
-    const wordCount = normalizedText.split(/\s+/).filter((word) => word.length > 0).length
-    if (wordCount > 200) {
-      confidence -= 25
-      reasons.push("Too much text for a thermostat")
-    }
-
-    // OCR quality factor - relaxed threshold
-    if (ocrConfidence < 40) {
-      confidence -= 10
-      reasons.push("Low image quality")
-    }
-
-    // Number pattern analysis (spreadsheets often have many numbers)
-    const numberMatches = text.match(/\d+/g) || []
-    if (numberMatches.length > 30) {
-      confidence -= 20
-      reasons.push("Contains many numbers (typical of spreadsheets)")
-    }
-
-    // Final confidence calculation
     confidence = Math.max(0, Math.min(100, confidence))
 
-    // Determine if this is a thermostat image - more lenient criteria
-    // Either high confidence OR multiple wire labels
-    const isThermostatImage = (confidence >= 30 && !hasNonThermostatKeywords) || detectedWires.length >= 2
+    const isThermostatImage = confidence >= 25 || detectedWires.length >= 2
 
-    // Analyze system type
+    // System type detection
     let systemType: "heat-pump" | "conventional" | "unknown" = "unknown"
     if (isThermostatImage) {
-      if (detectedWires.includes("O") || detectedWires.includes("B")) {
+      if (
+        detectedWires.includes("O") ||
+        detectedWires.includes("B") ||
+        detectedWires.includes("O/B") ||
+        normalizedText.includes("REVERSING") ||
+        normalizedText.includes("HEAT PUMP")
+      ) {
         systemType = "heat-pump"
       } else if (detectedWires.includes("W") || detectedWires.includes("W1") || detectedWires.includes("HEAT")) {
         systemType = "conventional"
@@ -301,20 +264,19 @@ export function UploadPhoto() {
     }
   }
 
-  function findWireLabelsEnhanced(text: string, labelList: string[]): string[] {
+  function findWireLabelsAdvanced(text: string, labelList: string[]): string[] {
     const normalizedText = text.toUpperCase()
     const foundLabels: string[] = []
 
-    // First try exact matches with word boundaries
     labelList.forEach((label) => {
-      // More flexible pattern matching for wire labels
       const patterns = [
-        new RegExp(`(^|[^A-Z0-9])${label}([^A-Z0-9]|$)`, "g"), // Standard boundary match
-        new RegExp(`${label}\\s*(WIRE|TERMINAL)`, "g"), // Label followed by WIRE or TERMINAL
-        new RegExp(`(WIRE|TERMINAL)\\s*${label}`, "g"), // WIRE or TERMINAL followed by label
-        new RegExp(`${label}\\s*:\\s*`, "g"), // Label followed by colon
-        new RegExp(`"${label}"`, "g"), // Label in quotes
-        new RegExp(`\$$${label}\$$`, "g"), // Label in parentheses
+        new RegExp(`\\b${label}\\b`, "g"),
+        new RegExp(`${label}\\s*(WIRE|TERMINAL|TERM)`, "g"),
+        new RegExp(`(WIRE|TERMINAL|TERM)\\s*${label}`, "g"),
+        new RegExp(`${label}\\s*[:\\-]`, "g"),
+        new RegExp(`[\$$\\[]${label}[\$$\\]]`, "g"),
+        new RegExp(`${label}\\d*`, "g"),
+        new RegExp(`${label}[\\+\\-]?`, "g"),
       ]
 
       if (patterns.some((pattern) => pattern.test(normalizedText))) {
@@ -322,17 +284,15 @@ export function UploadPhoto() {
       }
     })
 
-    // Then try more aggressive matching for single-letter labels (R, W, Y, G, C, O, B)
-    const singleLetterLabels = labelList.filter((label) => label.length === 1)
-    singleLetterLabels.forEach((label) => {
-      // Look for isolated occurrences of the letter that might be wire labels
-      const matches = normalizedText.match(new RegExp(`[^A-Z]${label}[^A-Z]`, "g"))
-      if (matches && matches.length > 0 && !foundLabels.includes(label)) {
-        foundLabels.push(label)
-      }
-    })
+    // Special handling for combined labels
+    if (normalizedText.includes("O/B") || normalizedText.includes("OB")) {
+      if (!foundLabels.includes("O/B")) foundLabels.push("O/B")
+    }
 
-    return [...new Set(foundLabels)] // Remove duplicates
+    if (normalizedText.includes("ACC+")) foundLabels.push("ACC+")
+    if (normalizedText.includes("ACC-")) foundLabels.push("ACC-")
+
+    return [...new Set(foundLabels)]
   }
 
   const handleSystemConfirmation = (isHeatPump: boolean) => {
@@ -419,7 +379,9 @@ export function UploadPhoto() {
                       )}
                       {analysisResult.detectedWires.length > 0 && (
                         <div>
-                          <p className="font-medium text-green-800 mb-2">Detected Wires:</p>
+                          <p className="font-medium text-green-800 mb-2">
+                            Detected Wires ({analysisResult.detectedWires.length}):
+                          </p>
                           <div className="flex flex-wrap justify-center gap-2">
                             {analysisResult.detectedWires.map((wire) => (
                               <span
