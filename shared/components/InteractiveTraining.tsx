@@ -27,6 +27,15 @@ interface ClickPoint {
   y: number
   terminal: string
   wireColor?: string
+  id: string // Add unique ID for each point
+}
+
+interface SavedConnection {
+  terminal: string
+  wireColor: string
+  id: string
+  x: number
+  y: number
 }
 
 export function InteractiveTraining({
@@ -37,6 +46,7 @@ export function InteractiveTraining({
   onCancel,
 }: InteractiveTrainingProps) {
   const [clickPoints, setClickPoints] = useState<ClickPoint[]>([])
+  const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
   const [selectedTerminal, setSelectedTerminal] = useState("R")
   const [selectedWireColor, setSelectedWireColor] = useState("red")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -84,12 +94,9 @@ export function InteractiveTraining({
     { name: "gray", hex: "#6b7280" },
   ]
 
-  // Add this function near the top of the component to help with debugging
-  const logClickPoints = (points: ClickPoint[]) => {
-    console.log("Current click points:", points)
-  }
+  const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9)
 
-  // Modify the handleImageClick function to ensure it's properly adding points
+  // Simplified click handler - only adds, never removes
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current || !containerRef.current) return
 
@@ -97,58 +104,59 @@ export function InteractiveTraining({
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
-    console.log(`Clicked at: ${x.toFixed(2)}%, ${y.toFixed(2)}%`)
-    console.log(`Current terminal: ${selectedTerminal}`)
-    console.log(`Current points before click:`, clickPoints)
-
-    const tolerance = 10
-
-    // Check if clicking on existing point to remove it
-    const existingPointIndex = clickPoints.findIndex(
-      (point) => Math.abs(point.x - x) < tolerance && Math.abs(point.y - y) < tolerance,
-    )
-
-    if (existingPointIndex !== -1) {
-      // Remove existing point
-      console.log(`Removing point at index ${existingPointIndex}`)
-      setClickPoints((prevPoints) => {
-        const newPoints = prevPoints.filter((_, index) => index !== existingPointIndex)
-        console.log(`Points after removal:`, newPoints)
-        return newPoints
-      })
-    } else {
-      // Add new point
-      const newPoint: ClickPoint = {
-        x,
-        y,
-        terminal: selectedTerminal,
-        wireColor: selectedWireColor,
-      }
-      console.log(`Adding new point:`, newPoint)
-
-      setClickPoints((prevPoints) => {
-        const newPoints = [...prevPoints, newPoint]
-        console.log(`Points after addition:`, newPoints)
-        return newPoints
-      })
+    // Create new connection and immediately save it
+    const newConnection: SavedConnection = {
+      terminal: selectedTerminal,
+      wireColor: selectedWireColor,
+      x,
+      y,
+      id: generateId(),
     }
+
+    // Add to saved connections immediately
+    setSavedConnections((prev) => [...prev, newConnection])
+
+    // Also add to click points for visual display
+    const newPoint: ClickPoint = {
+      x,
+      y,
+      terminal: selectedTerminal,
+      wireColor: selectedWireColor,
+      id: newConnection.id,
+    }
+
+    setClickPoints((prev) => [...prev, newPoint])
+
+    console.log(`Added connection: ${selectedTerminal} at ${x.toFixed(1)}%, ${y.toFixed(1)}%`)
+    console.log(`Total saved connections:`, savedConnections.length + 1)
   }
 
-  // Modify the handleSubmitTraining function to ensure it's properly collecting all points
+  // Remove a specific connection by ID
+  const removeConnection = (id: string) => {
+    setSavedConnections((prev) => prev.filter((conn) => conn.id !== id))
+    setClickPoints((prev) => prev.filter((point) => point.id !== id))
+  }
+
+  // Clear all connections
+  const clearAllConnections = () => {
+    setSavedConnections([])
+    setClickPoints([])
+  }
+
   const handleSubmitTraining = async () => {
     setIsSubmitting(true)
 
     try {
-      console.log("Submitting training with points:", clickPoints)
+      console.log("Submitting training with saved connections:", savedConnections)
 
-      // Create corrected wire connections
-      const correctedConnections: WireConnection[] = clickPoints.map((point) => ({
-        terminal: point.terminal,
+      // Create corrected wire connections from saved connections
+      const correctedConnections: WireConnection[] = savedConnections.map((conn) => ({
+        terminal: conn.terminal,
         hasWire: true,
-        wireColor: point.wireColor,
-        confidence: 1.0, // User is certain
-        x: point.x,
-        y: point.y,
+        wireColor: conn.wireColor,
+        confidence: 1.0,
+        x: conn.x,
+        y: conn.y,
       }))
 
       // Submit training data
@@ -160,7 +168,7 @@ export function InteractiveTraining({
         systemType,
         imageQuality,
         userFeedback: feedback,
-        clickCoordinates: clickPoints,
+        clickCoordinates: savedConnections,
         correctionType: "interactive_training",
       }
 
@@ -177,27 +185,22 @@ export function InteractiveTraining({
         console.log("Interactive training data submitted successfully")
       }
 
-      // Return the corrected wires - make sure we're getting ALL terminals
-      const correctedWires = clickPoints.map((point) => point.terminal)
+      // Return the corrected wires
+      const correctedWires = savedConnections.map((conn) => conn.terminal)
       onComplete([...new Set(correctedWires)]) // Remove duplicates
     } catch (error) {
       console.error("Error submitting training data:", error)
       // Still complete with user selections
-      const correctedWires = clickPoints.map((point) => point.terminal)
+      const correctedWires = savedConnections.map((conn) => conn.terminal)
       onComplete([...new Set(correctedWires)])
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const getSelectedWires = () => {
-    // Get unique terminals, but allow multiple clicks for same terminal
-    const terminalCounts: Record<string, number> = {}
-    clickPoints.forEach((point) => {
-      terminalCounts[point.terminal] = (terminalCounts[point.terminal] || 0) + 1
-    })
-
-    return Object.keys(terminalCounts)
+  const getUniqueTerminals = () => {
+    const terminals = savedConnections.map((conn) => conn.terminal)
+    return [...new Set(terminals)]
   }
 
   return (
@@ -215,25 +218,24 @@ export function InteractiveTraining({
             {/* Image Section */}
             <div>
               <div className="flex justify-between items-center mb-3">
-                <h4 className="font-medium text-[#2D2D2D]">Click on wire connections in the image:</h4>
+                <h4 className="font-medium text-[#2D2D2D]">Click on wire connections:</h4>
                 <button
-                  onClick={() => setClickPoints([])}
+                  onClick={clearAllConnections}
                   className="text-sm text-red-600 hover:text-red-800 underline"
-                  disabled={clickPoints.length === 0}
+                  disabled={savedConnections.length === 0}
                 >
-                  Clear All ({clickPoints.length})
+                  Clear All ({savedConnections.length})
                 </button>
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  <strong>Training Steps:</strong>
-                  <br />• <strong>Step 1:</strong> Select a terminal name below (e.g., "R")
-                  <br />• <strong>Step 2:</strong> Click on that terminal's wire in the image
-                  <br />• <strong>Step 3:</strong> Select a DIFFERENT terminal name (e.g., "Y1")
-                  <br />• <strong>Step 4:</strong> Click on that terminal's wire in the image
-                  <br />• <strong>Repeat:</strong> Continue until you've marked ALL visible wire connections
-                  <br />• <strong>Remove:</strong> Click on existing green dots to remove them
+                  <strong>Simple Training Steps:</strong>
+                  <br />• <strong>Step 1:</strong> Select a terminal name below (e.g., "Rc")
+                  <br />• <strong>Step 2:</strong> Click on that wire connection in the image
+                  <br />• <strong>Step 3:</strong> Connection is automatically saved!
+                  <br />• <strong>Step 4:</strong> Select next terminal and repeat
+                  <br />• <strong>Remove:</strong> Use the "×" button next to saved connections
                 </p>
               </div>
 
@@ -241,18 +243,27 @@ export function InteractiveTraining({
                 <p className="text-sm font-medium text-yellow-800">
                   🎯 Currently selecting: <strong>{selectedTerminal}</strong> ({selectedWireColor})
                   <br />
-                  Click on the <strong>{selectedTerminal}</strong> terminal's wire connection in the image above
+                  Click anywhere on the <strong>{selectedTerminal}</strong> wire connection in the image
                 </p>
               </div>
 
-              {clickPoints.length > 0 && (
+              {/* Saved Connections List */}
+              {savedConnections.length > 0 && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
-                  <h5 className="font-medium text-green-800 mb-2">✅ Marked Connections:</h5>
-                  <div className="flex flex-wrap gap-1">
-                    {clickPoints.map((point, index) => (
-                      <span key={index} className="bg-green-200 text-green-800 px-2 py-1 rounded text-xs">
-                        {point.terminal} ({point.wireColor})
-                      </span>
+                  <h5 className="font-medium text-green-800 mb-2">✅ Saved Connections:</h5>
+                  <div className="space-y-1">
+                    {savedConnections.map((conn) => (
+                      <div key={conn.id} className="flex items-center justify-between bg-white rounded px-2 py-1">
+                        <span className="text-sm">
+                          <strong>{conn.terminal}</strong> ({conn.wireColor})
+                        </span>
+                        <button
+                          onClick={() => removeConnection(conn.id)}
+                          className="text-red-600 hover:text-red-800 text-sm font-bold"
+                        >
+                          ×
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -273,9 +284,9 @@ export function InteractiveTraining({
                 />
 
                 {/* Overlay click points */}
-                {clickPoints.map((point, index) => (
+                {clickPoints.map((point) => (
                   <div
-                    key={index}
+                    key={point.id}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
                     style={{
                       left: `${point.x}%`,
@@ -300,14 +311,14 @@ export function InteractiveTraining({
               <div className="mt-3 text-sm">
                 <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                   <span className="text-gray-600">
-                    <strong>Total connections marked:</strong> {clickPoints.length}
+                    <strong>Total connections:</strong> {savedConnections.length}
                   </span>
                   <span className="text-gray-600">
-                    <strong>Unique terminals:</strong> {getSelectedWires().length}
+                    <strong>Unique terminals:</strong> {getUniqueTerminals().length}
                   </span>
                 </div>
                 <div className="mt-1 text-xs text-gray-500">
-                  Terminals: {getSelectedWires().join(", ") || "None selected"}
+                  Terminals: {getUniqueTerminals().join(", ") || "None selected"}
                 </div>
               </div>
             </div>
@@ -318,20 +329,17 @@ export function InteractiveTraining({
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Terminal to mark:</label>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Terminal to mark next:</label>
                   <div className="grid grid-cols-4 gap-2">
                     {commonTerminals.map((terminal) => {
-                      const count = clickPoints.filter((p) => p.terminal === terminal).length
+                      const count = savedConnections.filter((conn) => conn.terminal === terminal).length
+                      const isSelected = selectedTerminal === terminal
                       return (
                         <button
                           key={terminal}
-                          onClick={() => {
-                            console.log(`Selecting terminal: ${terminal}`)
-                            console.log(`Current points when selecting terminal:`, clickPoints)
-                            setSelectedTerminal(terminal)
-                          }}
-                          className={`px-3 py-2 rounded-lg text-sm font-medium relative ${
-                            selectedTerminal === terminal
+                          onClick={() => setSelectedTerminal(terminal)}
+                          className={`px-3 py-2 rounded-lg text-sm font-medium relative transition-colors ${
+                            isSelected
                               ? "bg-[#BAE5D4] text-[#2D2D2D] border-2 border-[#2D2D2D]"
                               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                           }`}
@@ -346,21 +354,6 @@ export function InteractiveTraining({
                       )
                     })}
                   </div>
-
-                  {/* Debug info */}
-                  <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
-                    <div>
-                      <strong>Debug Info:</strong>
-                    </div>
-                    <div>Selected Terminal: {selectedTerminal}</div>
-                    <div>Total Points: {clickPoints.length}</div>
-                    <div>
-                      Points:{" "}
-                      {JSON.stringify(
-                        clickPoints.map((p) => ({ terminal: p.terminal, x: p.x.toFixed(1), y: p.y.toFixed(1) })),
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 <div>
@@ -370,7 +363,7 @@ export function InteractiveTraining({
                       <button
                         key={color.name}
                         onClick={() => setSelectedWireColor(color.name)}
-                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                        className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
                           selectedWireColor === color.name
                             ? "bg-gray-800 text-white border-2 border-gray-900"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -393,7 +386,7 @@ export function InteractiveTraining({
                       <button
                         key={type}
                         onClick={() => setSystemType(type)}
-                        className={`px-3 py-2 rounded-lg text-sm ${
+                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                           systemType === type
                             ? "bg-[#BAE5D4] text-[#2D2D2D]"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -412,7 +405,7 @@ export function InteractiveTraining({
                       <button
                         key={quality}
                         onClick={() => setImageQuality(quality)}
-                        className={`px-3 py-2 rounded-lg text-sm capitalize ${
+                        className={`px-3 py-2 rounded-lg text-sm capitalize transition-colors ${
                           imageQuality === quality
                             ? "bg-[#BAE5D4] text-[#2D2D2D]"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -444,7 +437,7 @@ export function InteractiveTraining({
                         <strong>AI detected:</strong> {initialDetection.connectedWires.join(", ") || "None"}
                       </div>
                       <div>
-                        <strong>You marked:</strong> {getSelectedWires().join(", ") || "None"}
+                        <strong>You marked:</strong> {getUniqueTerminals().join(", ") || "None"}
                       </div>
                     </div>
                   </div>
@@ -455,10 +448,10 @@ export function InteractiveTraining({
 
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
             <InstallButton
-              title={`Submit Training & Continue (${getSelectedWires().length} wires)`}
+              title={`Submit Training & Continue (${getUniqueTerminals().length} wires)`}
               onPress={handleSubmitTraining}
               loading={isSubmitting}
-              disabled={clickPoints.length === 0}
+              disabled={savedConnections.length === 0}
               className="flex-1"
             />
             <InstallButton title="Cancel" onPress={onCancel} variant="secondary" className="flex-1" />
