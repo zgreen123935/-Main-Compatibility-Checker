@@ -366,6 +366,103 @@ export class SupabaseTrainingService {
     }
   }
 
+  // Get learning insights for AI enhancement
+  static async getLearningInsights() {
+    try {
+      const { data: allData, error } = await this.supabase
+        .from("training_data")
+        .select("*")
+        .eq("is_complete", true)
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      // Analyze AI accuracy over time
+      const accuracyData = allData
+        .filter((entry) => entry.metadata?.learningMetadata)
+        .map((entry) => ({
+          date: entry.created_at,
+          accuracy: entry.metadata.learningMetadata.aiAccuracy,
+          type: entry.metadata.learningMetadata.trainingType,
+        }))
+
+      // Calculate terminal co-occurrence patterns
+      const terminalPairs: Record<string, number> = {}
+      allData.forEach((entry) => {
+        const connections = entry.user_verified_connections as WireConnection[]
+        const terminals = connections.filter((conn) => conn.hasWire).map((conn) => conn.terminal)
+
+        for (let i = 0; i < terminals.length; i++) {
+          for (let j = i + 1; j < terminals.length; j++) {
+            const pair = [terminals[i], terminals[j]].sort().join("-")
+            terminalPairs[pair] = (terminalPairs[pair] || 0) + 1
+          }
+        }
+      })
+
+      // Get most common configurations
+      const configPatterns: Record<string, number> = {}
+      allData.forEach((entry) => {
+        const connections = entry.user_verified_connections as WireConnection[]
+        const terminals = connections
+          .filter((conn) => conn.hasWire)
+          .map((conn) => conn.terminal)
+          .sort()
+          .join(",")
+
+        configPatterns[terminals] = (configPatterns[terminals] || 0) + 1
+      })
+
+      const topConfigurations = Object.entries(configPatterns)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([config, count]) => ({
+          terminals: config.split(","),
+          frequency: count,
+          percentage: Math.round((count / allData.length) * 100),
+        }))
+
+      return {
+        totalTrainingImages: allData.length,
+        averageAIAccuracy:
+          accuracyData.length > 0
+            ? accuracyData.reduce((sum, item) => sum + item.accuracy, 0) / accuracyData.length
+            : 0,
+        accuracyTrend: accuracyData.slice(0, 10), // Last 10 training sessions
+        commonTerminalPairs: Object.entries(terminalPairs)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 10)
+          .map(([pair, count]) => ({ pair, count })),
+        topConfigurations,
+        learningVelocity: this.calculateLearningVelocity(accuracyData),
+      }
+    } catch (error) {
+      console.error("Error getting learning insights:", error)
+      return {
+        totalTrainingImages: 0,
+        averageAIAccuracy: 0,
+        accuracyTrend: [],
+        commonTerminalPairs: [],
+        topConfigurations: [],
+        learningVelocity: 0,
+      }
+    }
+  }
+
+  private static calculateLearningVelocity(accuracyData: any[]): number {
+    if (accuracyData.length < 2) return 0
+
+    const recent = accuracyData.slice(0, 5) // Last 5 sessions
+    const older = accuracyData.slice(5, 10) // Previous 5 sessions
+
+    if (recent.length === 0 || older.length === 0) return 0
+
+    const recentAvg = recent.reduce((sum, item) => sum + item.accuracy, 0) / recent.length
+    const olderAvg = older.reduce((sum, item) => sum + item.accuracy, 0) / older.length
+
+    return recentAvg - olderAvg // Positive means improving
+  }
+
   // Verification methods
   static async verifyConnection(): Promise<{ success: boolean; message: string; details?: any }> {
     try {

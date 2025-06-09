@@ -144,7 +144,52 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
     onWiresDetected(correctedWires)
   }
 
-  const handleQuickConfirm = () => {
+  const handleQuickConfirm = async () => {
+    // Save confirmation as training data
+    if (analysisResult && selectedWires.length > 0) {
+      try {
+        const confirmationTrainingData = {
+          imageUrl: previewUrl,
+          imageHash: analysisResult.imageHash,
+          userVerifiedConnections: selectedWires.map((wire, index) => ({
+            terminal: wire,
+            hasWire: true,
+            wireColor: "confirmed", // Mark as confirmed AI suggestion
+            confidence: 0.9,
+            x: 50 + index * 5,
+            y: 50 + index * 5,
+          })),
+          aiDetectedConnections: analysisResult.wireConnections || [],
+          systemType: analysisResult.systemType || "unknown",
+          imageQuality: "good",
+          userFeedback: "User confirmed AI suggestions",
+          correctionType: "ai_confirmation",
+          isComplete: true,
+          timestamp: Date.now(),
+          learningMetadata: {
+            userMadeCorrections: false,
+            aiAccuracy: 1.0, // User confirmed, so AI was 100% accurate
+            trainingType: "confirmatory",
+            confidenceBoost: 0.15,
+          },
+        }
+
+        // Save the confirmation as training data
+        await fetch("/api/wire-training", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "submit_training",
+            data: confirmationTrainingData,
+          }),
+        })
+
+        console.log("AI confirmation saved as training data")
+      } catch (error) {
+        console.error("Failed to save confirmation training:", error)
+      }
+    }
+
     onWiresDetected(selectedWires)
   }
 

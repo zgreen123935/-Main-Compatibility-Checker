@@ -198,18 +198,46 @@ export function InteractiveTraining({
     setClickPoints([])
   }
 
+  const calculateAIAccuracy = (aiPredictions: string[], userSelections: string[]) => {
+    if (aiPredictions.length === 0) return 0
+    const correct = aiPredictions.filter((pred) => userSelections.includes(pred)).length
+    return correct / aiPredictions.length
+  }
+
   // Final submission (marks training as complete)
   const handleSubmitTraining = async () => {
     setIsSubmitting(true)
 
+    // Always save training data - even if user just confirms AI suggestions
+    const shouldSaveTraining =
+      savedConnections.length > 0 || (initialDetection?.connectedWires && initialDetection.connectedWires.length > 0)
+
+    if (!shouldSaveTraining) {
+      console.log("No training data to save - user made no selections")
+      onComplete([])
+      return
+    }
+
+    // If user didn't make any corrections, use AI suggestions as confirmed training data
+    const finalConnections =
+      savedConnections.length > 0
+        ? savedConnections
+        : (initialDetection?.connectedWires || []).map((terminal, index) => ({
+            terminal,
+            wireColor: "unknown", // We don't have color info from AI-only detection
+            x: 50 + index * 5, // Spread them across the image
+            y: 50 + index * 5,
+            id: generateId(),
+          }))
+
     try {
       console.log("Submitting final training with saved connections:", savedConnections)
 
-      const correctedConnections: WireConnection[] = savedConnections.map((conn) => ({
+      const correctedConnections: WireConnection[] = finalConnections.map((conn) => ({
         terminal: conn.terminal,
         hasWire: true,
         wireColor: conn.wireColor,
-        confidence: 1.0,
+        confidence: savedConnections.length > 0 ? 1.0 : 0.8, // Lower confidence for AI-only confirmations
         x: conn.x,
         y: conn.y,
       }))
@@ -222,10 +250,20 @@ export function InteractiveTraining({
         systemType,
         imageQuality,
         userFeedback: feedback,
-        clickCoordinates: savedConnections,
-        correctionType: "interactive_training",
-        isComplete: true, // Mark as final/complete save
+        clickCoordinates: finalConnections,
+        correctionType: savedConnections.length > 0 ? "user_corrections" : "ai_confirmation",
+        isComplete: true,
         timestamp: Date.now(),
+        // New learning metadata
+        learningMetadata: {
+          userMadeCorrections: savedConnections.length > 0,
+          aiAccuracy: calculateAIAccuracy(
+            initialDetection?.connectedWires || [],
+            finalConnections.map((c) => c.terminal),
+          ),
+          trainingType: savedConnections.length > 0 ? "corrective" : "confirmatory",
+          confidenceBoost: savedConnections.length > 0 ? 0.2 : 0.1,
+        },
       }
 
       const response = await fetch("/api/wire-training", {

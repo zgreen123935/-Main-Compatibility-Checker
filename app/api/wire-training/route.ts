@@ -85,6 +85,11 @@ export async function POST(req: NextRequest) {
           message: `Import completed: ${importResult.imported} entries imported, ${importResult.errors} errors`,
         })
 
+      case "get_learning_insights":
+        console.log("Getting learning insights from Supabase...")
+        const learningInsights = await SupabaseTrainingService.getLearningInsights()
+        return NextResponse.json({ success: true, insights: learningInsights })
+
       default:
         console.error("Invalid action:", action)
         return NextResponse.json({ error: "Invalid action" }, { status: 400 })
