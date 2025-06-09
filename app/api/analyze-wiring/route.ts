@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { File } from "formdata-node"
+import { TrainingService } from "../../shared/services/trainingService"
 
 interface WireConnection {
   terminal: string
@@ -19,7 +20,7 @@ interface ImageAnalysis {
   suggestions: string[]
   imageHash: string
   similarConfigurations?: any[]
-  exactMatch?: any // Add exact match indicator
+  exactMatch?: any
   trainingSource?: "exact_match" | "similar_images" | "ai_only"
 }
 
@@ -68,8 +69,8 @@ async function analyzeWithTrainingData(
 ): Promise<ImageAnalysis> {
   console.log(`Analyzing image with hash: ${imageHash}`)
 
-  // STEP 1: Check for exact image hash match first
-  const exactMatch = await getExactImageMatch(imageHash)
+  // STEP 1: Check for exact image hash match first using TrainingService
+  const exactMatch = await TrainingService.getExactImageMatch(imageHash)
 
   if (exactMatch) {
     console.log(`Found exact match for image hash: ${imageHash}`)
@@ -108,8 +109,8 @@ async function analyzeWithTrainingData(
   // STEP 2: If no exact match, get initial AI analysis
   const aiAnalysis = await analyzeWithGPT4Vision(base64Image, mimeType)
 
-  // STEP 3: Look for similar configurations in training database
-  const similarConfigs = await getSimilarConfigurations(aiAnalysis.detectedTerminals, aiAnalysis.systemType)
+  // STEP 3: Look for similar configurations in training database using TrainingService
+  const similarConfigs = await TrainingService.getSimilarImages(aiAnalysis.detectedTerminals, aiAnalysis.systemType)
 
   // STEP 4: Enhance the analysis with training data insights
   const enhancedAnalysis = enhanceWithTrainingData(aiAnalysis, similarConfigs)
@@ -120,31 +121,6 @@ async function analyzeWithTrainingData(
     similarConfigurations: similarConfigs,
     trainingSource: similarConfigs.length > 0 ? "similar_images" : "ai_only",
   }
-}
-
-// NEW: Function to get exact image match
-async function getExactImageMatch(imageHash: string) {
-  try {
-    console.log(`Looking for exact match with hash: ${imageHash}`)
-
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/wire-training`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "get_exact_match",
-        data: { imageHash },
-      }),
-    })
-
-    if (response.ok) {
-      const result = await response.json()
-      console.log(`Exact match result:`, result)
-      return result.exactMatch || null
-    }
-  } catch (error) {
-    console.error("Failed to get exact image match:", error)
-  }
-  return null
 }
 
 async function analyzeWithGPT4Vision(base64Image: string, mimeType: string) {
@@ -276,27 +252,6 @@ Provide detailed JSON analysis:
       suggestions: [],
     }
   }
-}
-
-async function getSimilarConfigurations(detectedTerminals: string[], systemType: string) {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/wire-training`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "get_similar",
-        data: { detectedTerminals, systemType },
-      }),
-    })
-
-    if (response.ok) {
-      const result = await response.json()
-      return result.similarImages || []
-    }
-  } catch (error) {
-    console.error("Failed to get similar configurations:", error)
-  }
-  return []
 }
 
 function enhanceWithTrainingData(analysis: any, similarConfigs: any[]) {
