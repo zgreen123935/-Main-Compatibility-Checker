@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { InstallButton } from "./InstallButton"
 
 interface WireConnection {
@@ -27,7 +27,7 @@ interface ClickPoint {
   y: number
   terminal: string
   wireColor?: string
-  id: string // Add unique ID for each point
+  id: string
 }
 
 interface SavedConnection {
@@ -53,6 +53,8 @@ export function InteractiveTraining({
   const [systemType, setSystemType] = useState<"heat-pump" | "conventional" | "unknown">("unknown")
   const [imageQuality, setImageQuality] = useState<"excellent" | "good" | "fair" | "poor">("good")
   const [feedback, setFeedback] = useState("")
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -96,7 +98,66 @@ export function InteractiveTraining({
 
   const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9)
 
-  // Simplified click handler - only adds, never removes
+  // Auto-save training data when connections change
+  useEffect(() => {
+    if (autoSaveEnabled && savedConnections.length > 0) {
+      const timeoutId = setTimeout(() => {
+        savePartialTrainingData()
+      }, 2000) // Auto-save after 2 seconds of inactivity
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [savedConnections, autoSaveEnabled])
+
+  // Save partial training data (without completing the flow)
+  const savePartialTrainingData = async () => {
+    if (savedConnections.length === 0) return
+
+    try {
+      const partialTrainingData = {
+        imageUrl,
+        imageHash: initialDetection?.imageHash || "unknown",
+        userVerifiedConnections: savedConnections.map((conn) => ({
+          terminal: conn.terminal,
+          hasWire: true,
+          wireColor: conn.wireColor,
+          confidence: 1.0,
+          x: conn.x,
+          y: conn.y,
+        })),
+        aiDetectedConnections: initialDetection?.wireConnections || [],
+        systemType,
+        imageQuality,
+        userFeedback: feedback,
+        clickCoordinates: savedConnections,
+        correctionType: "partial_training",
+        isComplete: false, // Mark as partial save
+        timestamp: Date.now(),
+      }
+
+      const response = await fetch("/api/wire-training", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_partial",
+          data: partialTrainingData,
+        }),
+      })
+
+      if (response.ok) {
+        setLastSaveTime(new Date())
+        console.log("Partial training data auto-saved")
+      }
+    } catch (error) {
+      console.error("Auto-save failed:", error)
+    }
+  }
+
+  // Manual save function
+  const saveTrainingNow = async () => {
+    await savePartialTrainingData()
+  }
+
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current || !containerRef.current) return
 
@@ -104,7 +165,6 @@ export function InteractiveTraining({
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
-    // Create new connection and immediately save it
     const newConnection: SavedConnection = {
       terminal: selectedTerminal,
       wireColor: selectedWireColor,
@@ -113,10 +173,8 @@ export function InteractiveTraining({
       id: generateId(),
     }
 
-    // Add to saved connections immediately
     setSavedConnections((prev) => [...prev, newConnection])
 
-    // Also add to click points for visual display
     const newPoint: ClickPoint = {
       x,
       y,
@@ -128,28 +186,25 @@ export function InteractiveTraining({
     setClickPoints((prev) => [...prev, newPoint])
 
     console.log(`Added connection: ${selectedTerminal} at ${x.toFixed(1)}%, ${y.toFixed(1)}%`)
-    console.log(`Total saved connections:`, savedConnections.length + 1)
   }
 
-  // Remove a specific connection by ID
   const removeConnection = (id: string) => {
     setSavedConnections((prev) => prev.filter((conn) => conn.id !== id))
     setClickPoints((prev) => prev.filter((point) => point.id !== id))
   }
 
-  // Clear all connections
   const clearAllConnections = () => {
     setSavedConnections([])
     setClickPoints([])
   }
 
+  // Final submission (marks training as complete)
   const handleSubmitTraining = async () => {
     setIsSubmitting(true)
 
     try {
-      console.log("Submitting training with saved connections:", savedConnections)
+      console.log("Submitting final training with saved connections:", savedConnections)
 
-      // Create corrected wire connections from saved connections
       const correctedConnections: WireConnection[] = savedConnections.map((conn) => ({
         terminal: conn.terminal,
         hasWire: true,
@@ -159,8 +214,7 @@ export function InteractiveTraining({
         y: conn.y,
       }))
 
-      // Submit training data
-      const trainingData = {
+      const finalTrainingData = {
         imageUrl,
         imageHash: initialDetection?.imageHash || "unknown",
         userVerifiedConnections: correctedConnections,
@@ -170,6 +224,8 @@ export function InteractiveTraining({
         userFeedback: feedback,
         clickCoordinates: savedConnections,
         correctionType: "interactive_training",
+        isComplete: true, // Mark as final/complete save
+        timestamp: Date.now(),
       }
 
       const response = await fetch("/api/wire-training", {
@@ -177,25 +233,37 @@ export function InteractiveTraining({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "submit_training",
-          data: trainingData,
+          data: finalTrainingData,
         }),
       })
 
       if (response.ok) {
-        console.log("Interactive training data submitted successfully")
+        console.log("Final training data submitted successfully")
       }
 
-      // Return the corrected wires
       const correctedWires = savedConnections.map((conn) => conn.terminal)
-      onComplete([...new Set(correctedWires)]) // Remove duplicates
+      onComplete([...new Set(correctedWires)])
     } catch (error) {
       console.error("Error submitting training data:", error)
-      // Still complete with user selections
       const correctedWires = savedConnections.map((conn) => conn.terminal)
       onComplete([...new Set(correctedWires)])
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Enhanced cancel that can optionally save partial data
+  const handleCancel = async () => {
+    if (savedConnections.length > 0) {
+      const shouldSave = confirm(
+        `You have ${savedConnections.length} marked connections. Save this training data before cancelling?`,
+      )
+
+      if (shouldSave) {
+        await savePartialTrainingData()
+      }
+    }
+    onCancel()
   }
 
   const getUniqueTerminals = () => {
@@ -209,9 +277,53 @@ export function InteractiveTraining({
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-medium text-[#2D2D2D]">Interactive Wire Training</h3>
-            <button onClick={onCancel} className="text-gray-500 hover:text-gray-700 text-2xl">
-              ×
-            </button>
+            <div className="flex items-center gap-4">
+              {/* Auto-save status */}
+              <div className="text-sm text-gray-600">
+                {autoSaveEnabled ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>Auto-save ON</span>
+                    {lastSaveTime && <span className="text-xs">(saved {lastSaveTime.toLocaleTimeString()})</span>}
+                  </div>
+                ) : (
+                  <span className="text-gray-500">Auto-save OFF</span>
+                )}
+              </div>
+              <button onClick={handleCancel} className="text-gray-500 hover:text-gray-700 text-2xl">
+                ×
+              </button>
+            </div>
+          </div>
+
+          {/* Save Controls */}
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={autoSaveEnabled}
+                    onChange={(e) => setAutoSaveEnabled(e.target.checked)}
+                  />
+                  <span className="text-sm">Auto-save training data</span>
+                </label>
+                <button
+                  onClick={saveTrainingNow}
+                  className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                  disabled={savedConnections.length === 0}
+                >
+                  Save Now
+                </button>
+              </div>
+              <div className="text-xs text-gray-500">
+                {savedConnections.length > 0
+                  ? autoSaveEnabled
+                    ? "Auto-saves 2s after changes"
+                    : "Manual save only"
+                  : "No data to save"}
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -230,20 +342,17 @@ export function InteractiveTraining({
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  <strong>Simple Training Steps:</strong>
-                  <br />• <strong>Step 1:</strong> Select a terminal name below (e.g., "Rc")
-                  <br />• <strong>Step 2:</strong> Click on that wire connection in the image
-                  <br />• <strong>Step 3:</strong> Connection is automatically saved!
-                  <br />• <strong>Step 4:</strong> Select next terminal and repeat
-                  <br />• <strong>Remove:</strong> Use the "×" button next to saved connections
+                  <strong>Training Steps:</strong>
+                  <br />• Select terminal → Click wire → Automatically saved!
+                  <br />• Training data saves automatically as you work
+                  <br />• Use "×" button to remove individual connections
+                  <br />• Your progress is preserved even if you cancel
                 </p>
               </div>
 
               <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-2 mb-3">
                 <p className="text-sm font-medium text-yellow-800">
                   🎯 Currently selecting: <strong>{selectedTerminal}</strong> ({selectedWireColor})
-                  <br />
-                  Click anywhere on the <strong>{selectedTerminal}</strong> wire connection in the image
                 </p>
               </div>
 
@@ -316,9 +425,6 @@ export function InteractiveTraining({
                   <span className="text-gray-600">
                     <strong>Unique terminals:</strong> {getUniqueTerminals().length}
                   </span>
-                </div>
-                <div className="mt-1 text-xs text-gray-500">
-                  Terminals: {getUniqueTerminals().join(", ") || "None selected"}
                 </div>
               </div>
             </div>
@@ -448,13 +554,13 @@ export function InteractiveTraining({
 
           <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
             <InstallButton
-              title={`Submit Training & Continue (${getUniqueTerminals().length} wires)`}
+              title={`Complete Training & Continue (${getUniqueTerminals().length} wires)`}
               onPress={handleSubmitTraining}
               loading={isSubmitting}
               disabled={savedConnections.length === 0}
               className="flex-1"
             />
-            <InstallButton title="Cancel" onPress={onCancel} variant="secondary" className="flex-1" />
+            <InstallButton title="Cancel" onPress={handleCancel} variant="secondary" className="flex-1" />
           </div>
         </div>
       </div>
