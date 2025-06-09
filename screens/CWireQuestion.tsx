@@ -1,13 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { InstallButton } from "../shared/components/InstallButton"
 import { TooltipButton } from "../shared/components/TooltipButton"
 import { useInstall } from "../shared/context/InstallContext"
 
 export function CWireQuestion() {
-  const { dispatch } = useInstall()
-  const [hasCWire, setHasCWire] = useState<boolean | null>(null)
+  const { dispatch, state } = useInstall()
+  const [hasCWire, setHasCWire] = useState<boolean | null>(state.automatedDecisions.hasCWireDetected ?? null)
+
+  // Auto-skip if C-wire was detected in photo
+  useEffect(() => {
+    if (state.automatedDecisions.hasCWireDetected !== undefined) {
+      // Show automated decision but still allow user to verify
+      setHasCWire(state.automatedDecisions.hasCWireDetected)
+    }
+  }, [state.automatedDecisions.hasCWireDetected])
 
   const handleSelection = (hasC: boolean) => {
     setHasCWire(hasC)
@@ -33,6 +41,16 @@ export function CWireQuestion() {
             Does your old thermostat have a wire connected to the terminal labeled 'C'?
           </p>
         </div>
+
+        {state.automatedDecisions.hasCWireDetected !== undefined && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-green-800 mb-2">🤖 Auto-Detected from Photo</h3>
+            <p className="text-green-700 text-sm">
+              We detected {state.automatedDecisions.hasCWireDetected ? "a C-wire connection" : "no C-wire"} in your
+              photo. Please verify this is correct.
+            </p>
+          </div>
+        )}
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
           <div className="flex items-start">

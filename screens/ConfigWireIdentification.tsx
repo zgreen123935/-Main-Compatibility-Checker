@@ -1,13 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { InstallButton } from "../shared/components/InstallButton"
 import { TooltipButton } from "../shared/components/TooltipButton"
 import { useInstall } from "../shared/context/InstallContext"
 
 export function ConfigWireIdentification() {
   const { dispatch, state } = useInstall()
-  const [selectedWires, setSelectedWires] = useState<string[]>(state.answers.detectedWires || [])
+  const [selectedWires, setSelectedWires] = useState<string[]>(
+    state.automatedDecisions.detectedWires || state.answers.detectedWires || [],
+  )
   const [otherWires, setOtherWires] = useState("")
   const [showManualSelection, setShowManualSelection] = useState(false)
   const [showTrainingMode, setShowTrainingMode] = useState(false)
@@ -67,6 +69,13 @@ export function ConfigWireIdentification() {
     dispatch({ type: "SET_STEP", step: "config-dual-fuel" })
   }
 
+  // Auto-select detected wires on component mount
+  useEffect(() => {
+    if (state.automatedDecisions.detectedWires?.length > 0) {
+      setSelectedWires(state.automatedDecisions.detectedWires)
+    }
+  }, [state.automatedDecisions.detectedWires])
+
   // Remove the complex mode selection since it's now handled in photo upload
   // Just show the manual selection interface with pre-selected wires if available
 
@@ -81,6 +90,22 @@ export function ConfigWireIdentification() {
               : "Select which wires your old thermostat has connected."}
           </p>
         </div>
+
+        {state.automatedDecisions.detectedWires?.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-blue-800 mb-2">🤖 Auto-Selected from Photo Analysis</h3>
+            <p className="text-blue-700 text-sm mb-2">
+              We've pre-selected these wires based on your photo. Please verify they're correct:
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {state.automatedDecisions.detectedWires.map((wire) => (
+                <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium">
+                  {wire}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {selectedWires.length > 0 && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">

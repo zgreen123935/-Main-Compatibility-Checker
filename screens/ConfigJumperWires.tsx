@@ -1,13 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { InstallButton } from "../shared/components/InstallButton"
 import { TooltipButton } from "../shared/components/TooltipButton"
 import { useInstall } from "../shared/context/InstallContext"
 
 export function ConfigJumperWires() {
-  const { dispatch } = useInstall()
-  const [hasJumperWires, setHasJumperWires] = useState<boolean | null>(null)
+  const { dispatch, state } = useInstall()
+  const [hasJumperWires, setHasJumperWires] = useState<boolean | null>(
+    state.automatedDecisions.hasJumpersDetected ?? null,
+  )
+
+  // Auto-detect jumpers from photo analysis
+  useEffect(() => {
+    if (state.automatedDecisions.hasJumpersDetected !== undefined) {
+      setHasJumperWires(state.automatedDecisions.hasJumpersDetected)
+    }
+  }, [state.automatedDecisions.hasJumpersDetected])
 
   const handleSelection = (hasJumpers: boolean) => {
     setHasJumperWires(hasJumpers)
@@ -26,6 +35,20 @@ export function ConfigJumperWires() {
           <h1 className="text-3xl font-medium text-[#2D2D2D] mb-6">Jumper Wire Check</h1>
           <p className="text-[#4B5563] leading-relaxed">Do you see any jumper wires on your old thermostat?</p>
         </div>
+
+        {state.automatedDecisions.hasJumpersDetected && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+            <h3 className="font-medium text-orange-800 mb-2">🤖 Jumpers Detected in Photo</h3>
+            <p className="text-orange-700 text-sm">
+              We found {state.automatedDecisions.detectedJumpers?.length || 0} jumper wire(s) in your photo:
+              {state.automatedDecisions.detectedJumpers?.map((jumper, i) => (
+                <span key={i} className="block">
+                  • {jumper.fromTerminal} → {jumper.toTerminal}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
           <div className="flex items-start">

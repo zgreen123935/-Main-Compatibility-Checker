@@ -1,229 +1,145 @@
 "use client"
 
-import type React from "react"
+import { useState, useCallback } from "react"
+import { View, Text, Image, Button, StyleSheet, ActivityIndicator } from "react-native"
+import * as ImagePicker from "expo-image-picker"
+import * as FileSystem from "expo-file-system"
+import { useFocusEffect } from "@react-navigation/native"
+import { useDispatch } from "react-redux"
 
-import { useState } from "react"
-import { InstallButton } from "../shared/components/InstallButton"
-import { useInstall } from "../shared/context/InstallContext"
-import { PhotoGuide } from "../shared/components/PhotoGuide"
-import { WireDetection } from "../shared/components/WireDetection"
-import { SupabaseVerificationDashboard } from "../shared/components/SupabaseVerificationDashboard"
+const UploadPhoto = () => {
+  const [image, setImage] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [analysisResults, setAnalysisResults] = useState(null)
+  const [showResults, setShowResults] = useState(false)
+  const dispatch = useDispatch()
 
-interface AnalysisResult {
-  isThermostatImage: boolean
-  systemType: "heat-pump" | "conventional" | "unknown"
-  detectedWires: string[]
-  confidence: number
-  reasons: string[]
-  wireConnections?: { terminal: string; hasWire: boolean; confidence: number; wireColor?: string }[]
-  connectedWires: any
-}
-
-export function UploadPhoto() {
-  const { dispatch } = useInstall()
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
-  const [detectedWires, setDetectedWires] = useState<string[]>([])
-  const [showModeSelection, setShowModeSelection] = useState(true)
-  const [selectedMode, setSelectedMode] = useState<"training" | "detection" | "skip" | "verification" | null>(null)
-
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size must be less than 5MB")
-        return
+  useFocusEffect(
+    useCallback(() => {
+      // Reset state when the screen is focused
+      setImage(null)
+      setUploading(false)
+      setAnalysisResults(null)
+      setShowResults(false)
+      return () => {
+        // Optional: Cleanup function when the screen is unfocused
+        // For example, you might want to clear any pending uploads
       }
+    }, []),
+  )
 
-      setSelectedFile(file)
-      const url = URL.createObjectURL(file)
-      setPreviewUrl(url)
-      dispatch({ type: "SET_PHOTO", url })
+  const pickImage = async () => {
+    // No permissions request is necessary for launching the image library
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    })
+
+    console.log(result)
+
+    if (!result.canceled) {
+      setImage(result.assets[0].uri)
     }
   }
 
-  const handleModeSelection = (mode: "training" | "detection" | "skip" | "verification") => {
-    setSelectedMode(mode)
-    setShowModeSelection(false)
+  const uploadImage = async () => {
+    if (!image) {
+      alert("Please select an image first.")
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      // Convert image to base64
+      const base64 = await FileSystem.readAsStringAsync(image, { encoding: "base64" })
+      const imageData = `data:image/jpeg;base64,${base64}` // Assuming JPEG format
+
+      // Replace with your API endpoint
+      const apiUrl = "YOUR_API_ENDPOINT"
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image: imageData }),
+      })
+
+      const data = await response.json()
+      console.log("Upload successful:", data)
+
+      handleAnalysisComplete(data)
+    } catch (error) {
+      console.error("Error uploading image:", error)
+      alert("Error uploading image. Please try again.")
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const handleWiresDetected = (wires: string[]) => {
-    setDetectedWires(wires)
-    // Store the detected wires for later use in wire identification step
-    dispatch({ type: "SET_ANSWER", key: "detectedWires", value: wires })
-  }
+  const handleAnalysisComplete = (results: any) => {
+    setAnalysisResults(results)
+    setShowResults(true)
 
-  const handleSystemConfirmation = (isHeatPump: boolean) => {
-    dispatch({ type: "SET_ANSWER", key: "heatPump", value: isHeatPump })
-    handleContinue()
-  }
+    // Set automated decisions based on detection results
+    const hasCWire = results.terminals?.some((t: any) => t.label?.toUpperCase().includes("C") && t.hasWire)
 
-  const handleContinue = () => {
-    dispatch({ type: "COMPLETE_STEP", step: "upload-photo" })
-    dispatch({ type: "SET_STEP", step: "remove-cover" })
-  }
+    const hasJumpers = results.jumpers && results.jumpers.length > 0
 
-  const handleSkip = () => {
-    dispatch({ type: "COMPLETE_STEP", step: "upload-photo" })
-    dispatch({ type: "SET_STEP", step: "remove-cover" })
+    const detectedWires = results.terminals?.filter((t: any) => t.hasWire)?.map((t: any) => t.label) || []
+
+    dispatch({
+      type: "SET_AUTOMATED_DECISIONS",
+      decisions: {
+        hasCWireDetected: hasCWire,
+        hasJumpersDetected: hasJumpers,
+        detectedWires: detectedWires,
+        detectedJumpers: results.jumpers || [],
+      },
+    })
+
+    // Apply automated flow decisions
+    dispatch({ type: "APPLY_AUTOMATED_FLOW" })
   }
 
   return (
-    <div className="min-h-screen bg-white px-6 py-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-medium text-[#2D2D2D] mb-6">Document Your Wiring</h1>
-          <p className="text-[#4B5563] leading-relaxed">
-            Take a photo of your current thermostat wiring. You can help train our AI or just get quick wire detection.
-          </p>
-        </div>
+    <View style={styles.container}>
+      <Button title="Pick an image from camera roll" onPress={pickImage} />
+      {image && <Image source={{ uri: image }} style={styles.image} />}
+      <Button title="Upload image" onPress={uploadImage} disabled={uploading} />
 
-        {/* Mode Selection */}
-        {showModeSelection && (
-          <div className="mb-8">
-            <h3 className="text-lg font-medium text-[#2D2D2D] mb-4 text-center">Choose your approach:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div
-                className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
-                onClick={() => handleModeSelection("training")}
-              >
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🎯</div>
-                  <h3 className="font-medium text-[#2D2D2D] mb-2">AI Training Mode</h3>
-                  <p className="text-sm text-[#4B5563]">
-                    Upload photo, click on terminals to train AI, help improve detection for everyone
-                  </p>
-                </div>
-              </div>
+      {uploading && <ActivityIndicator size="large" color="#0000ff" />}
 
-              <div
-                className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
-                onClick={() => handleModeSelection("detection")}
-              >
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🤖</div>
-                  <h3 className="font-medium text-[#2D2D2D] mb-2">Smart Detection</h3>
-                  <p className="text-sm text-[#4B5563]">
-                    Upload photo, let AI detect wires automatically, quick review and continue
-                  </p>
-                </div>
-              </div>
-
-              <div
-                className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
-                onClick={() => handleModeSelection("skip")}
-              >
-                <div className="text-center">
-                  <div className="text-3xl mb-2">⏭️</div>
-                  <h3 className="font-medium text-[#2D2D2D] mb-2">Skip Photo</h3>
-                  <p className="text-sm text-[#4B5563]">
-                    Skip photo upload, manually select wires later in the process
-                  </p>
-                </div>
-              </div>
-
-              <div
-                className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
-                onClick={() => handleModeSelection("verification")}
-              >
-                <div className="text-center">
-                  <div className="text-3xl mb-2">🔍</div>
-                  <h3 className="font-medium text-[#2D2D2D] mb-2">Verify Supabase</h3>
-                  <p className="text-sm text-[#4B5563]">Test database connection and verify training data storage</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Developer Test Link */}
-        <div className="text-center mb-4">
-          <button
-            onClick={() => {
-              // Temporarily navigate to test page
-              dispatch({ type: "SET_STEP", step: "supabase-test" as any })
-            }}
-            className="text-sm text-blue-600 underline hover:text-blue-800"
-          >
-            🔧 Test Supabase Integration
-          </button>
-        </div>
-
-        {selectedMode === "verification" && <SupabaseVerificationDashboard />}
-
-        {/* Skip Mode */}
-        {selectedMode === "skip" && (
-          <div className="text-center">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 mb-6">
-              <div className="text-4xl mb-4">⏭️</div>
-              <h3 className="text-lg font-medium text-[#2D2D2D] mb-2">Photo Skipped</h3>
-              <p className="text-[#4B5563]">
-                You'll be able to manually select your wires later in the installation process.
-              </p>
-            </div>
-            <InstallButton title="Continue" onPress={handleContinue} className="w-full" />
-          </div>
-        )}
-
-        {/* Training or Detection Mode */}
-        {(selectedMode === "training" || selectedMode === "detection") && (
-          <>
-            <PhotoGuide />
-
-            <WireDetection
-              onWiresDetected={handleWiresDetected}
-              onSkip={handleSkip}
-              trainingMode={selectedMode === "training"}
-              onSystemDetected={(systemType) => {
-                if (systemType !== "unknown") {
-                  dispatch({ type: "SET_ANSWER", key: "heatPump", value: systemType === "heat-pump" })
-                }
-              }}
-            />
-
-            {detectedWires.length > 0 && (
-              <div className="mt-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                  <h3 className="font-medium text-green-800 mb-2">✅ Wires Detected & Saved</h3>
-                  <p className="text-green-700 text-sm mb-3">
-                    Found {detectedWires.length} wire connections. These will be pre-selected in the wire identification
-                    step.
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {detectedWires.map((wire) => (
-                      <span
-                        key={wire}
-                        className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium"
-                      >
-                        {wire}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <InstallButton title="Continue with Detected Wires" onPress={handleContinue} className="w-full" />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Back to mode selection */}
-        {!showModeSelection && selectedMode !== "skip" && detectedWires.length === 0 && (
-          <div className="text-center mt-6">
-            <button
-              onClick={() => {
-                setShowModeSelection(true)
-                setSelectedMode(null)
-                setPreviewUrl(null)
-                setSelectedFile(null)
-              }}
-              className="text-[#2D2D2D] underline"
-            >
-              ← Back to mode selection
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+      {showResults && analysisResults && (
+        <View style={styles.resultsContainer}>
+          <Text>Analysis Results:</Text>
+          <Text>{JSON.stringify(analysisResults, null, 2)}</Text>
+        </View>
+      )}
+    </View>
   )
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  image: {
+    width: 200,
+    height: 200,
+    marginVertical: 20,
+  },
+  resultsContainer: {
+    marginTop: 20,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
+  },
+})
+
+export default UploadPhoto
