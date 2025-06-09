@@ -7,6 +7,7 @@ import { InstallButton } from "../shared/components/InstallButton"
 import { useInstall } from "../shared/context/InstallContext"
 import { PhotoGuide } from "../shared/components/PhotoGuide"
 import { WireDetection } from "../shared/components/WireDetection"
+import { SupabaseVerificationDashboard } from "../shared/components/SupabaseVerificationDashboard"
 
 interface AnalysisResult {
   isThermostatImage: boolean
@@ -25,7 +26,7 @@ export function UploadPhoto() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [detectedWires, setDetectedWires] = useState<string[]>([])
   const [showModeSelection, setShowModeSelection] = useState(true)
-  const [selectedMode, setSelectedMode] = useState<"training" | "detection" | "skip" | null>(null)
+  const [selectedMode, setSelectedMode] = useState<"training" | "detection" | "skip" | "verification" | null>(null)
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -42,7 +43,7 @@ export function UploadPhoto() {
     }
   }
 
-  const handleModeSelection = (mode: "training" | "detection" | "skip") => {
+  const handleModeSelection = (mode: "training" | "detection" | "skip" | "verification") => {
     setSelectedMode(mode)
     setShowModeSelection(false)
   }
@@ -82,7 +83,7 @@ export function UploadPhoto() {
         {showModeSelection && (
           <div className="mb-8">
             <h3 className="text-lg font-medium text-[#2D2D2D] mb-4 text-center">Choose your approach:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div
                 className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
                 onClick={() => handleModeSelection("training")}
@@ -121,9 +122,22 @@ export function UploadPhoto() {
                   </p>
                 </div>
               </div>
+
+              <div
+                className="border-2 rounded-lg p-4 cursor-pointer transition-colors border-gray-200 hover:border-[#BAE5D4] hover:bg-green-50"
+                onClick={() => handleModeSelection("verification")}
+              >
+                <div className="text-center">
+                  <div className="text-3xl mb-2">🔍</div>
+                  <h3 className="font-medium text-[#2D2D2D] mb-2">Verify Supabase</h3>
+                  <p className="text-sm text-[#4B5563]">Test database connection and verify training data storage</p>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {selectedMode === "verification" && <SupabaseVerificationDashboard />}
 
         {/* Skip Mode */}
         {selectedMode === "skip" && (

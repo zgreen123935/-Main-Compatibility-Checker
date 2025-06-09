@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { TrainingService } from "../../../shared/services/trainingService"
+import { SupabaseTrainingService } from "../../../shared/services/supabaseTrainingService"
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,37 +12,37 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case "submit_training":
-        console.log("Submitting training data...")
-        const submitResult = await TrainingService.submitTrainingData(data)
+        console.log("Submitting training data to Supabase...")
+        const submitResult = await SupabaseTrainingService.submitTrainingData(data)
         return NextResponse.json({
           success: true,
           id: submitResult.id,
-          message: "Training data submitted successfully",
+          message: "Training data submitted to Supabase successfully",
           isUpdate: submitResult.isUpdate,
         })
 
       case "save_partial":
-        console.log("Saving partial training data...")
-        const partialResult = await TrainingService.savePartialTrainingData(data)
+        console.log("Saving partial training data to Supabase...")
+        const partialResult = await SupabaseTrainingService.savePartialTrainingData(data)
         return NextResponse.json({
           success: true,
           id: partialResult.id,
-          message: "Partial training data saved successfully",
+          message: "Partial training data saved to Supabase successfully",
           isUpdate: partialResult.isUpdate,
         })
 
       case "get_exact_match":
-        console.log("Getting exact match for hash:", data.imageHash)
-        const exactMatch = await TrainingService.getExactImageMatch(data.imageHash)
+        console.log("Getting exact match from Supabase for hash:", data.imageHash)
+        const exactMatch = await SupabaseTrainingService.getExactImageMatch(data.imageHash)
         return NextResponse.json({
           success: true,
           exactMatch,
-          message: exactMatch ? "Exact image match found" : "No exact match found",
+          message: exactMatch ? "Exact image match found in Supabase" : "No exact match found in Supabase",
         })
 
       case "get_similar":
-        console.log("Getting similar images...")
-        const similarImages = await TrainingService.getSimilarImages(data.detectedTerminals, data.systemType)
+        console.log("Getting similar images from Supabase...")
+        const similarImages = await SupabaseTrainingService.getSimilarImages(data.detectedTerminals, data.systemType)
         return NextResponse.json({
           success: true,
           similarImages,
@@ -50,25 +50,25 @@ export async function POST(req: NextRequest) {
         })
 
       case "get_stats":
-        console.log("Getting training stats...")
-        const stats = await TrainingService.getTrainingStats()
+        console.log("Getting training stats from Supabase...")
+        const stats = await SupabaseTrainingService.getTrainingStats()
         return NextResponse.json({ success: true, stats })
 
       case "get_all_data":
         // Debug endpoint
         console.log("Getting all training data...")
-        const allData = await TrainingService.getAllTrainingData()
+        const allData = await SupabaseTrainingService.getAllTrainingData()
         return NextResponse.json({ success: true, data: allData })
 
       case "clear_all_data":
         // Debug endpoint
         console.log("Clearing all training data...")
-        await TrainingService.clearAllTrainingData()
+        await SupabaseTrainingService.clearAllTrainingData()
         return NextResponse.json({ success: true, message: "All training data cleared" })
 
       case "export_data":
         console.log("Exporting training data...")
-        const exportData = await TrainingService.exportTrainingData()
+        const exportData = await SupabaseTrainingService.exportTrainingData()
         return NextResponse.json({
           success: true,
           data: exportData,
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
       case "import_data":
         console.log("Importing training data...")
-        const importResult = await TrainingService.importTrainingData(data.jsonData)
+        const importResult = await SupabaseTrainingService.importTrainingData(data.jsonData)
         return NextResponse.json({
           success: true,
           imported: importResult.imported,
