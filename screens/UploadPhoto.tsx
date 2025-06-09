@@ -49,26 +49,31 @@ export function UploadPhoto() {
 
   const handleWiresDetected = (wires: string[], analysisResult?: any) => {
     setDetectedWires(wires)
-    // Store the detected wires for later use in wire identification step
+
+    // Store the detected wires for later use
     dispatch({ type: "SET_ANSWER", key: "detectedWires", value: wires })
 
     // Set automated decisions based on analysis
-    if (analysisResult) {
-      const hasCWire = analysisResult.wireConnections?.some((w: any) => w.terminal?.toUpperCase() === "C" && w.hasWire)
+    const hasCWire =
+      wires.includes("C") ||
+      analysisResult?.wireConnections?.some((w: any) => w.terminal?.toUpperCase() === "C" && w.hasWire)
 
-      const hasJumpers = analysisResult.jumperConnections && analysisResult.jumperConnections.length > 0
+    const hasJumpers = analysisResult?.jumperConnections && analysisResult.jumperConnections.length > 0
 
-      dispatch({
-        type: "SET_ANSWER",
-        key: "automatedDecisions",
-        value: {
-          hasCWireDetected: hasCWire,
-          hasJumpersDetected: hasJumpers,
-          detectedWires: wires,
-          detectedJumpers: analysisResult.jumperConnections || [],
-        },
-      })
-    }
+    dispatch({
+      type: "SET_AUTOMATED_DECISIONS",
+      decisions: {
+        hasCWireDetected: hasCWire,
+        hasJumpersDetected: hasJumpers,
+        detectedWires: wires,
+        detectedJumpers: analysisResult?.jumperConnections || [],
+      },
+    })
+
+    console.log("UploadPhoto - Setting automated decisions:", {
+      hasCWireDetected: hasCWire,
+      detectedWires: wires,
+    })
   }
 
   const handleSystemConfirmation = (isHeatPump: boolean) => {
