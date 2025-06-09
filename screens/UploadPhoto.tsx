@@ -105,6 +105,29 @@ const UploadPhoto = () => {
     dispatch({ type: "APPLY_AUTOMATED_FLOW" })
   }
 
+  const handleWiresDetected = (wires: string[], analysisResult?: any) => {
+    // Store detected wires
+    dispatch({ type: "SET_ANSWER", key: "detectedWires", value: wires })
+
+    // Set automated decisions based on analysis
+    if (analysisResult) {
+      const hasCWire = analysisResult.wireConnections?.some((w: any) => w.terminal?.toUpperCase() === "C" && w.hasWire)
+
+      const hasJumpers = analysisResult.jumperConnections && analysisResult.jumperConnections.length > 0
+
+      dispatch({
+        type: "SET_ANSWER",
+        key: "automatedDecisions",
+        value: {
+          hasCWireDetected: hasCWire,
+          hasJumpersDetected: hasJumpers,
+          detectedWires: wires,
+          detectedJumpers: analysisResult.jumperConnections || [],
+        },
+      })
+    }
+  }
+
   return (
     <View style={styles.container}>
       <Button title="Pick an image from camera roll" onPress={pickImage} />

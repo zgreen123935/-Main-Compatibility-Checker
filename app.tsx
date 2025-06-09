@@ -29,9 +29,29 @@ import { PhysicalInstallAnchors } from "./screens/PhysicalInstallAnchors"
 import { PhysicalTrimPlate } from "./screens/PhysicalTrimPlate"
 import { PhysicalAttachPlate } from "./screens/PhysicalAttachPlate"
 import { SupabaseTestPage } from "./screens/SupabaseTestPage"
+import { useEffect } from "react"
 
 function InstallGuideContent() {
-  const { state } = useInstall()
+  const { state, dispatch } = useInstall()
+
+  // Auto-skip logic based on automated decisions
+  useEffect(() => {
+    const { automatedDecisions } = state
+
+    // Skip C-wire question if we detected a C-wire
+    if (state.currentStep === "c-wire-question" && automatedDecisions.hasCWireDetected === true) {
+      dispatch({ type: "SET_ANSWER", key: "hasCWire", value: true })
+      dispatch({ type: "COMPLETE_STEP", step: "c-wire-question" })
+      dispatch({ type: "SET_STEP", step: "config-jumper-wires" })
+      return
+    }
+
+    // Skip C-wire requirement if we detected a C-wire
+    if (state.currentStep === "c-wire-requirement" && automatedDecisions.hasCWireDetected === true) {
+      dispatch({ type: "SET_STEP", step: "config-jumper-wires" })
+      return
+    }
+  }, [state.currentStep, state.automatedDecisions, dispatch, state])
 
   const renderCurrentScreen = () => {
     switch (state.currentStep) {
