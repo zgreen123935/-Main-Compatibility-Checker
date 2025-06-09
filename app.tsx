@@ -28,6 +28,7 @@ import { PhysicalHeatingSources } from "./screens/PhysicalHeatingSources"
 import { PhysicalInstallAnchors } from "./screens/PhysicalInstallAnchors"
 import { PhysicalTrimPlate } from "./screens/PhysicalTrimPlate"
 import { PhysicalAttachPlate } from "./screens/PhysicalAttachPlate"
+import { SupabaseTestPage } from "./screens/SupabaseTestPage"
 
 function InstallGuideContent() {
   const { state } = useInstall()
@@ -86,6 +87,8 @@ function InstallGuideContent() {
         return <PhysicalAttachPlate />
       case "completion-congratulations":
         return <CompletionCongratulations />
+      case "supabase-test":
+        return <SupabaseTestPage />
       default:
         return <ProductSelection />
     }

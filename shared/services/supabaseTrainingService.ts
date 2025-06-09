@@ -464,4 +464,129 @@ export class SupabaseTrainingService {
       }
     }
   }
+
+  // Get all training data (for debugging)
+  static async getAllTrainingData(): Promise<TrainingData[]> {
+    try {
+      const { data, error } = await this.supabase
+        .from("training_data")
+        .select("*")
+        .order("created_at", { ascending: false })
+
+      if (error) throw error
+
+      return data || []
+    } catch (error) {
+      console.error("Error in getAllTrainingData:", error)
+      throw error
+    }
+  }
+
+  // Clear all training data (for testing)
+  static async clearAllTrainingData(): Promise<void> {
+    try {
+      const { error } = await this.supabase
+        .from("training_data")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000") // Delete all records
+
+      if (error) throw error
+
+      // Also clear similar configurations
+      const { error: configError } = await this.supabase
+        .from("similar_configurations")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000")
+
+      if (configError) throw configError
+
+      console.log("Cleared all training data from Supabase")
+    } catch (error) {
+      console.error("Error clearing training data:", error)
+      throw error
+    }
+  }
+
+  // Export training data to JSON
+  static async exportTrainingData(): Promise<string> {
+    try {
+      const trainingDatabase = await this.getAllTrainingData()
+      return JSON.stringify(trainingDatabase, null, 2)
+    } catch (error) {
+      console.error("Error exporting training data:", error)
+      throw error
+    }
+  }
+
+  // Import training data from JSON
+  static async importTrainingData(jsonData: string): Promise<{ success: boolean; imported: number; errors: number }> {
+    try {
+      const importedData = JSON.parse(jsonData) as any[]
+
+      if (!Array.isArray(importedData)) {
+        throw new Error("Invalid data format - expected array")
+      }
+
+      let imported = 0
+      let errors = 0
+
+      for (const entry of importedData) {
+        try {
+          // Validate entry structure
+          if (!entry.image_hash || !entry.created_at) {
+            errors++
+            continue
+          }
+
+          // Convert to Supabase format
+          const supabaseEntry: TrainingDataInsert = {
+            image_hash: entry.image_hash,
+            image_url: entry.image_url,
+            user_verified_connections: entry.user_verified_connections || entry.userVerifiedConnections,
+            ai_detected_connections: entry.ai_detected_connections || entry.aiDetectedConnections,
+            system_type: entry.system_type || entry.systemType || "unknown",
+            thermostat_brand: entry.thermostat_brand || entry.thermostatBrand,
+            thermostat_model: entry.thermostat_model || entry.thermostatModel,
+            image_quality: entry.image_quality || entry.imageQuality || "good",
+            user_feedback: entry.user_feedback || entry.userFeedback,
+            is_complete: entry.is_complete ?? entry.isComplete ?? true,
+            correction_type: entry.correction_type || entry.correctionType,
+            confidence_score: entry.confidence_score || entry.confidence,
+            metadata: entry.metadata || {},
+          }
+
+          // Check if entry already exists
+          const { data: existing } = await this.supabase
+            .from("training_data")
+            .select("id, created_at")
+            .eq("image_hash", supabaseEntry.image_hash)
+            .single()
+
+          if (existing) {
+            // Update if imported data is newer
+            const existingDate = new Date(existing.created_at)
+            const importedDate = new Date(entry.created_at)
+
+            if (importedDate > existingDate) {
+              await this.supabase.from("training_data").update(supabaseEntry).eq("id", existing.id)
+              imported++
+            }
+          } else {
+            // Insert new entry
+            await this.supabase.from("training_data").insert(supabaseEntry)
+            imported++
+          }
+        } catch (entryError) {
+          console.error("Error processing entry:", entryError)
+          errors++
+        }
+      }
+
+      console.log(`Import completed: ${imported} imported, ${errors} errors`)
+      return { success: true, imported, errors }
+    } catch (error) {
+      console.error("Error importing training data:", error)
+      throw error
+    }
+  }
 }

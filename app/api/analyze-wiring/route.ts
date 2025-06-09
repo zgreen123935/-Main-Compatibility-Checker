@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import type { File } from "formdata-node"
-import { TrainingService } from "../../../shared/services/trainingService"
+import { SupabaseTrainingService } from "../../../shared/services/supabaseTrainingService"
 
 interface WireConnection {
   terminal: string
@@ -93,15 +93,15 @@ async function analyzeWithTrainingData(
   try {
     console.log(`Analyzing image with hash: ${imageHash}`)
 
-    // STEP 1: Check for exact image hash match first using TrainingService
-    console.log("Checking for exact match...")
-    const exactMatch = await TrainingService.getExactImageMatch(imageHash)
+    // STEP 1: Check for exact image hash match first using SupabaseTrainingService
+    console.log("Checking for exact match in Supabase...")
+    const exactMatch = await SupabaseTrainingService.getExactImageMatch(imageHash)
 
     if (exactMatch) {
       console.log(`Found exact match for image hash: ${imageHash}`)
 
       // Use the user's previous training data directly
-      const userTrainedConnections = exactMatch.userVerifiedConnections || []
+      const userTrainedConnections = (exactMatch.user_verified_connections as WireConnection[]) || []
       const connectedWires = userTrainedConnections
         .filter((conn: WireConnection) => conn.hasWire)
         .map((conn: WireConnection) => conn.terminal)
@@ -110,12 +110,12 @@ async function analyzeWithTrainingData(
         detectedTerminals: connectedWires,
         wireConnections: userTrainedConnections,
         connectedWires,
-        systemType: exactMatch.systemType || "unknown",
+        systemType: exactMatch.system_type as "heat-pump" | "conventional" | "unknown",
         confidence: 95, // High confidence since user previously trained this
         isThermostatImage: true,
         reasons: [
-          "Exact image match found in training database",
-          `Previously trained by user on ${new Date(exactMatch.timestamp).toLocaleDateString()}`,
+          "Exact image match found in Supabase database",
+          `Previously trained on ${new Date(exactMatch.created_at).toLocaleDateString()}`,
           `Found ${connectedWires.length} user-verified wire connections`,
           "Using previous training data directly",
         ],
@@ -136,13 +136,16 @@ async function analyzeWithTrainingData(
     const aiAnalysis = await analyzeWithGPT4Vision(base64Image, mimeType)
     console.log("AI analysis completed")
 
-    // STEP 3: Look for similar configurations in training database using TrainingService
-    console.log("Looking for similar configurations...")
-    const similarConfigs = await TrainingService.getSimilarImages(aiAnalysis.detectedTerminals, aiAnalysis.systemType)
+    // STEP 3: Look for similar configurations in Supabase using SupabaseTrainingService
+    console.log("Looking for similar configurations in Supabase...")
+    const similarConfigs = await SupabaseTrainingService.getSimilarImages(
+      aiAnalysis.detectedTerminals,
+      aiAnalysis.systemType,
+    )
     console.log(`Found ${similarConfigs.length} similar configurations`)
 
     // STEP 4: Enhance the analysis with training data insights
-    console.log("Enhancing analysis with training data...")
+    console.log("Enhancing analysis with Supabase training data...")
     const enhancedAnalysis = enhanceWithTrainingData(aiAnalysis, similarConfigs)
 
     return {
@@ -154,6 +157,74 @@ async function analyzeWithTrainingData(
   } catch (error) {
     console.error("Error in analyzeWithTrainingData:", error)
     throw error
+  }
+}
+
+function enhanceWithTrainingData(analysis: any, similarConfigs: any[]) {
+  try {
+    if (similarConfigs.length === 0) {
+      return analysis
+    }
+
+    // Analyze patterns from similar configurations
+    const terminalFrequency: Record<string, number> = {}
+    const wireColorPatterns: Record<string, Record<string, number>> = {}
+
+    similarConfigs.forEach((config) => {
+      const connections = config.user_verified_connections as WireConnection[]
+      connections.forEach((conn: WireConnection) => {
+        if (conn.hasWire) {
+          terminalFrequency[conn.terminal] = (terminalFrequency[conn.terminal] || 0) + 1
+
+          if (conn.wireColor) {
+            if (!wireColorPatterns[conn.terminal]) {
+              wireColorPatterns[conn.terminal] = {}
+            }
+            wireColorPatterns[conn.terminal][conn.wireColor] =
+              (wireColorPatterns[conn.terminal][conn.wireColor] || 0) + 1
+          }
+        }
+      })
+    })
+
+    // Enhance confidence based on training data
+    const enhancedConnections = analysis.wireConnections.map((conn: WireConnection) => {
+      const frequency = terminalFrequency[conn.terminal] || 0
+      const totalSimilar = similarConfigs.length
+
+      if (frequency > 0) {
+        const patternConfidence = frequency / totalSimilar
+        const enhancedConfidence = Math.min(0.95, conn.confidence + patternConfidence * 0.2)
+
+        return {
+          ...conn,
+          confidence: enhancedConfidence,
+        }
+      }
+
+      return conn
+    })
+
+    const enhancedReasons = [
+      ...analysis.reasons,
+      `Found ${similarConfigs.length} similar configurations in Supabase training data`,
+      `Most common terminals in similar setups: ${Object.entries(terminalFrequency)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([terminal]) => terminal)
+        .join(", ")}`,
+    ]
+
+    return {
+      ...analysis,
+      wireConnections: enhancedConnections,
+      confidence: Math.min(95, analysis.confidence + (similarConfigs.length > 2 ? 10 : 5)),
+      reasons: enhancedReasons,
+    }
+  } catch (error) {
+    console.error("Error in enhanceWithTrainingData:", error)
+    // Return original analysis if enhancement fails
+    return analysis
   }
 }
 
@@ -297,73 +368,6 @@ Provide detailed JSON analysis:
   } catch (error) {
     console.error("Error in analyzeWithGPT4Vision:", error)
     throw error
-  }
-}
-
-function enhanceWithTrainingData(analysis: any, similarConfigs: any[]) {
-  try {
-    if (similarConfigs.length === 0) {
-      return analysis
-    }
-
-    // Analyze patterns from similar configurations
-    const terminalFrequency: Record<string, number> = {}
-    const wireColorPatterns: Record<string, Record<string, number>> = {}
-
-    similarConfigs.forEach((config) => {
-      config.userVerifiedConnections.forEach((conn: WireConnection) => {
-        if (conn.hasWire) {
-          terminalFrequency[conn.terminal] = (terminalFrequency[conn.terminal] || 0) + 1
-
-          if (conn.wireColor) {
-            if (!wireColorPatterns[conn.terminal]) {
-              wireColorPatterns[conn.terminal] = {}
-            }
-            wireColorPatterns[conn.terminal][conn.wireColor] =
-              (wireColorPatterns[conn.terminal][conn.wireColor] || 0) + 1
-          }
-        }
-      })
-    })
-
-    // Enhance confidence based on training data
-    const enhancedConnections = analysis.wireConnections.map((conn: WireConnection) => {
-      const frequency = terminalFrequency[conn.terminal] || 0
-      const totalSimilar = similarConfigs.length
-
-      if (frequency > 0) {
-        const patternConfidence = frequency / totalSimilar
-        const enhancedConfidence = Math.min(0.95, conn.confidence + patternConfidence * 0.2)
-
-        return {
-          ...conn,
-          confidence: enhancedConfidence,
-        }
-      }
-
-      return conn
-    })
-
-    const enhancedReasons = [
-      ...analysis.reasons,
-      `Found ${similarConfigs.length} similar configurations in training data`,
-      `Most common terminals in similar setups: ${Object.entries(terminalFrequency)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 3)
-        .map(([terminal]) => terminal)
-        .join(", ")}`,
-    ]
-
-    return {
-      ...analysis,
-      wireConnections: enhancedConnections,
-      confidence: Math.min(95, analysis.confidence + (similarConfigs.length > 2 ? 10 : 5)),
-      reasons: enhancedReasons,
-    }
-  } catch (error) {
-    console.error("Error in enhanceWithTrainingData:", error)
-    // Return original analysis if enhancement fails
-    return analysis
   }
 }
 

@@ -137,6 +137,19 @@ export function UploadPhoto() {
           </div>
         )}
 
+        {/* Developer Test Link */}
+        <div className="text-center mb-4">
+          <button
+            onClick={() => {
+              // Temporarily navigate to test page
+              dispatch({ type: "SET_STEP", step: "supabase-test" as any })
+            }}
+            className="text-sm text-blue-600 underline hover:text-blue-800"
+          >
+            🔧 Test Supabase Integration
+          </button>
+        </div>
+
         {selectedMode === "verification" && <SupabaseVerificationDashboard />}
 
         {/* Skip Mode */}
