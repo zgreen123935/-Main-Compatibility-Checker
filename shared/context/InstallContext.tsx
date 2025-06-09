@@ -1,13 +1,16 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useReducer } from "react"
+
+import { createContext, useContext, useReducer, type ReactNode } from "react"
+import type { InstallStep, InstallProgress, ConfigInput } from "../types"
 
 interface InstallState {
-  answers: {
-    hasCWire?: boolean
-    jumperRemoved?: boolean
-  }
+  currentStep: InstallStep
+  completedSteps: InstallStep[]
+  answers: Record<string, any>
+  photoURL?: string
+  configInput: Partial<ConfigInput>
   automatedDecisions: {
     hasCWireDetected?: boolean
     hasJumpersDetected?: boolean
@@ -17,70 +20,81 @@ interface InstallState {
 }
 
 type InstallAction =
-  | { type: "SET_HAS_CWIRE"; hasCWire: boolean }
-  | { type: "SET_JUMPER_REMOVED"; jumperRemoved: boolean }
+  | { type: "SET_STEP"; step: InstallStep }
+  | { type: "COMPLETE_STEP"; step: InstallStep }
+  | { type: "SET_ANSWER"; key: string; value: any }
+  | { type: "SET_PHOTO"; url: string }
+  | { type: "RESET" }
+  | { type: "LOAD_PROGRESS"; progress: InstallProgress }
   | { type: "SET_AUTOMATED_DECISIONS"; decisions: Partial<InstallState["automatedDecisions"]> }
-  | { type: "APPLY_AUTOMATED_FLOW" }
 
 const initialState: InstallState = {
+  currentStep: "product-selection",
+  completedSteps: [],
   answers: {},
+  configInput: {},
   automatedDecisions: {},
 }
 
-const InstallContext = createContext<{
-  state: InstallState
-  dispatch: React.Dispatch<InstallAction>
-}>({
-  state: initialState,
-  dispatch: () => null,
-})
-
-const installReducer = (state: InstallState, action: InstallAction): InstallState => {
+function installReducer(state: InstallState, action: InstallAction): InstallState {
   switch (action.type) {
-    case "SET_HAS_CWIRE":
-      return { ...state, answers: { ...state.answers, hasCWire: action.hasCWire } }
-    case "SET_JUMPER_REMOVED":
-      return { ...state, answers: { ...state.answers, jumperRemoved: action.jumperRemoved } }
+    case "SET_STEP":
+      return { ...state, currentStep: action.step }
+
+    case "COMPLETE_STEP":
+      return {
+        ...state,
+        completedSteps: [...state.completedSteps.filter((s) => s !== action.step), action.step],
+      }
+
+    case "SET_ANSWER":
+      return {
+        ...state,
+        answers: { ...state.answers, [action.key]: action.value },
+      }
+
+    case "SET_PHOTO":
+      return { ...state, photoURL: action.url }
+
+    case "RESET":
+      return initialState
+
+    case "LOAD_PROGRESS":
+      return {
+        ...state,
+        currentStep: action.progress.step as InstallStep,
+        completedSteps: action.progress.completedSteps || [],
+        answers: action.progress.answers || {},
+        photoURL: action.progress.photoURL,
+        configInput: {},
+      }
+
     case "SET_AUTOMATED_DECISIONS":
       return {
         ...state,
         automatedDecisions: { ...state.automatedDecisions, ...action.decisions },
       }
 
-    case "APPLY_AUTOMATED_FLOW":
-      // Apply automated flow logic based on detected conditions
-      const { hasCWireDetected, hasJumpersDetected } = state.automatedDecisions
-
-      const updates: Partial<InstallState> = {}
-
-      // Auto-answer C-wire question if detected
-      if (hasCWireDetected !== undefined) {
-        updates.answers = { ...state.answers, hasCWire: hasCWireDetected }
-      }
-
-      // Auto-answer jumper question if detected
-      if (hasJumpersDetected !== undefined) {
-        updates.answers = { ...state.answers, jumperRemoved: hasJumpersDetected }
-      }
-
-      return { ...state, ...updates }
     default:
       return state
   }
 }
 
-const InstallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const InstallContext = createContext<{
+  state: InstallState
+  dispatch: React.Dispatch<InstallAction>
+} | null>(null)
+
+export function InstallProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(installReducer, initialState)
 
   return <InstallContext.Provider value={{ state, dispatch }}>{children}</InstallContext.Provider>
 }
 
-const useInstall = () => {
+export function useInstall() {
   const context = useContext(InstallContext)
   if (!context) {
-    throw new Error("useInstall must be used within an InstallProvider")
+    throw new Error("useInstall must be used within InstallProvider")
   }
   return context
 }
-
-export { InstallProvider, useInstall }

@@ -36,10 +36,10 @@ function InstallGuideContent() {
 
   // Auto-skip logic based on automated decisions
   useEffect(() => {
-    const { automatedDecisions } = state
+    const hasCWireDetected = state.automatedDecisions.hasCWireDetected
 
     // Skip C-wire question if we detected a C-wire
-    if (state.currentStep === "c-wire-question" && automatedDecisions.hasCWireDetected === true) {
+    if (state.currentStep === "c-wire-question" && hasCWireDetected === true) {
       dispatch({ type: "SET_ANSWER", key: "hasCWire", value: true })
       dispatch({ type: "COMPLETE_STEP", step: "c-wire-question" })
       dispatch({ type: "SET_STEP", step: "config-jumper-wires" })
@@ -47,11 +47,11 @@ function InstallGuideContent() {
     }
 
     // Skip C-wire requirement if we detected a C-wire
-    if (state.currentStep === "c-wire-requirement" && automatedDecisions.hasCWireDetected === true) {
+    if (state.currentStep === "c-wire-requirement" && hasCWireDetected === true) {
       dispatch({ type: "SET_STEP", step: "config-jumper-wires" })
       return
     }
-  }, [state.currentStep, state.automatedDecisions, dispatch, state])
+  }, [state.currentStep, state.automatedDecisions, dispatch])
 
   const renderCurrentScreen = () => {
     switch (state.currentStep) {

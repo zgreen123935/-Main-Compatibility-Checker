@@ -64,7 +64,7 @@ export function ProgressStepper({ currentStep, completedSteps }: ProgressStepper
 
   const isPhaseCompleted = (phaseIndex: number) => {
     const phase = stepPhases[phaseIndex]
-    return phase.steps.every((step) => completedSteps.includes(step as InstallStep))
+    return phase.steps.every((step) => completedSteps?.includes(step as InstallStep))
   }
 
   const isPhaseActive = (phaseIndex: number) => {
