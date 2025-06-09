@@ -1,3 +1,6 @@
+import { promises as fs } from "fs"
+import path from "path"
+
 interface TrainingData {
   id: string
   imageUrl: string
@@ -21,17 +24,61 @@ interface WireConnection {
   confidence: number
 }
 
-// In-memory database for demo - in production, use a real database
-const trainingDatabase: TrainingData[] = []
-
 export class TrainingService {
+  private static readonly DATA_FILE = path.join(process.cwd(), "data", "training-data.json")
+  private static cache: TrainingData[] | null = null
+
   static generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substr(2)
+  }
+
+  // Ensure data directory exists
+  private static async ensureDataDirectory(): Promise<void> {
+    const dataDir = path.dirname(this.DATA_FILE)
+    try {
+      await fs.access(dataDir)
+    } catch {
+      await fs.mkdir(dataDir, { recursive: true })
+    }
+  }
+
+  // Load training data from file
+  private static async loadTrainingData(): Promise<TrainingData[]> {
+    if (this.cache !== null) {
+      return this.cache
+    }
+
+    try {
+      await this.ensureDataDirectory()
+      const data = await fs.readFile(this.DATA_FILE, "utf-8")
+      this.cache = JSON.parse(data)
+      console.log(`Loaded ${this.cache.length} training entries from file`)
+      return this.cache
+    } catch (error) {
+      // File doesn't exist or is invalid, start with empty array
+      console.log("No existing training data found, starting fresh")
+      this.cache = []
+      return this.cache
+    }
+  }
+
+  // Save training data to file
+  private static async saveTrainingData(data: TrainingData[]): Promise<void> {
+    try {
+      await this.ensureDataDirectory()
+      await fs.writeFile(this.DATA_FILE, JSON.stringify(data, null, 2), "utf-8")
+      this.cache = data
+      console.log(`Saved ${data.length} training entries to file`)
+    } catch (error) {
+      console.error("Failed to save training data:", error)
+      throw error
+    }
   }
 
   static async getExactImageMatch(imageHash: string): Promise<TrainingData | null> {
     try {
       console.log(`Searching for exact match with hash: ${imageHash}`)
+      const trainingDatabase = await this.loadTrainingData()
       console.log(`Current database has ${trainingDatabase.length} entries`)
 
       // Find exact image hash match
@@ -56,6 +103,7 @@ export class TrainingService {
         `Looking for similar images with terminals: ${detectedTerminals.join(", ")} and system type: ${systemType}`,
       )
 
+      const trainingDatabase = await this.loadTrainingData()
       const similarImages = trainingDatabase
         .filter((entry) => entry.isComplete) // Only use complete training data for similarity
         .filter((entry) => {
@@ -80,6 +128,8 @@ export class TrainingService {
 
   static async savePartialTrainingData(data: any): Promise<{ success: boolean; id: string; isUpdate: boolean }> {
     try {
+      const trainingDatabase = await this.loadTrainingData()
+
       const trainingEntry: TrainingData = {
         id: this.generateId(),
         imageUrl: data.imageUrl,
@@ -104,11 +154,13 @@ export class TrainingService {
       if (existingIndex >= 0) {
         // Update existing partial entry
         trainingDatabase[existingIndex] = trainingEntry
+        await this.saveTrainingData(trainingDatabase)
         console.log("Updated partial training data:", trainingEntry.id)
         return { success: true, id: trainingEntry.id, isUpdate: true }
       } else {
         // Add new partial entry
         trainingDatabase.push(trainingEntry)
+        await this.saveTrainingData(trainingDatabase)
         console.log("Saved new partial training data:", trainingEntry.id)
         return { success: true, id: trainingEntry.id, isUpdate: false }
       }
@@ -120,6 +172,8 @@ export class TrainingService {
 
   static async submitTrainingData(data: any): Promise<{ success: boolean; id: string; isUpdate: boolean }> {
     try {
+      const trainingDatabase = await this.loadTrainingData()
+
       const trainingEntry: TrainingData = {
         id: this.generateId(),
         imageUrl: data.imageUrl,
@@ -154,11 +208,13 @@ export class TrainingService {
       if (existingCompleteIndex >= 0) {
         // Update existing complete entry
         trainingDatabase[existingCompleteIndex] = trainingEntry
+        await this.saveTrainingData(trainingDatabase)
         console.log("Updated existing complete training data:", trainingEntry.id)
         return { success: true, id: trainingEntry.id, isUpdate: true }
       } else {
         // Add new complete entry
         trainingDatabase.push(trainingEntry)
+        await this.saveTrainingData(trainingDatabase)
         console.log("Saved new complete training data:", trainingEntry.id)
         return { success: true, id: trainingEntry.id, isUpdate: false }
       }
@@ -170,6 +226,7 @@ export class TrainingService {
 
   static async getTrainingStats() {
     try {
+      const trainingDatabase = await this.loadTrainingData()
       const completeEntries = trainingDatabase.filter((entry) => entry.isComplete)
 
       const stats = {
@@ -186,8 +243,10 @@ export class TrainingService {
           fair: completeEntries.filter((entry) => entry.imageQuality === "fair").length,
           poor: completeEntries.filter((entry) => entry.imageQuality === "poor").length,
         },
-        commonTerminals: this.getTerminalFrequency(),
+        commonTerminals: await this.getTerminalFrequency(),
         uniqueImageHashes: new Set(completeEntries.map((entry) => entry.imageHash)).size,
+        dataFile: this.DATA_FILE,
+        lastModified: await this.getLastModified(),
       }
 
       return stats
@@ -197,8 +256,9 @@ export class TrainingService {
     }
   }
 
-  static getTerminalFrequency() {
+  static async getTerminalFrequency() {
     try {
+      const trainingDatabase = await this.loadTrainingData()
       const terminalCounts: Record<string, number> = {}
       const completeEntries = trainingDatabase.filter((entry) => entry.isComplete)
 
@@ -220,14 +280,88 @@ export class TrainingService {
     }
   }
 
+  // Get last modified time of data file
+  private static async getLastModified(): Promise<string | null> {
+    try {
+      const stats = await fs.stat(this.DATA_FILE)
+      return stats.mtime.toISOString()
+    } catch {
+      return null
+    }
+  }
+
   // Get all training data (for debugging)
-  static getAllTrainingData(): TrainingData[] {
+  static async getAllTrainingData(): Promise<TrainingData[]> {
+    const trainingDatabase = await this.loadTrainingData()
     return [...trainingDatabase]
   }
 
   // Clear all training data (for testing)
-  static clearAllTrainingData(): void {
-    trainingDatabase.length = 0
-    console.log("Cleared all training data")
+  static async clearAllTrainingData(): Promise<void> {
+    try {
+      this.cache = []
+      await this.saveTrainingData([])
+      console.log("Cleared all training data")
+    } catch (error) {
+      console.error("Error clearing training data:", error)
+      throw error
+    }
+  }
+
+  // Export training data to JSON
+  static async exportTrainingData(): Promise<string> {
+    const trainingDatabase = await this.loadTrainingData()
+    return JSON.stringify(trainingDatabase, null, 2)
+  }
+
+  // Import training data from JSON
+  static async importTrainingData(jsonData: string): Promise<{ success: boolean; imported: number; errors: number }> {
+    try {
+      const importedData = JSON.parse(jsonData) as TrainingData[]
+
+      if (!Array.isArray(importedData)) {
+        throw new Error("Invalid data format - expected array")
+      }
+
+      const currentData = await this.loadTrainingData()
+      let imported = 0
+      let errors = 0
+
+      for (const entry of importedData) {
+        try {
+          // Validate entry structure
+          if (!entry.id || !entry.imageHash || !entry.timestamp) {
+            errors++
+            continue
+          }
+
+          // Check if entry already exists
+          const existingIndex = currentData.findIndex((existing) => existing.imageHash === entry.imageHash)
+
+          if (existingIndex >= 0) {
+            // Update existing entry if imported one is newer
+            if (entry.timestamp > currentData[existingIndex].timestamp) {
+              currentData[existingIndex] = entry
+              imported++
+            }
+          } else {
+            // Add new entry
+            currentData.push(entry)
+            imported++
+          }
+        } catch (entryError) {
+          console.error("Error processing entry:", entryError)
+          errors++
+        }
+      }
+
+      await this.saveTrainingData(currentData)
+      console.log(`Import completed: ${imported} imported, ${errors} errors`)
+
+      return { success: true, imported, errors }
+    } catch (error) {
+      console.error("Error importing training data:", error)
+      throw error
+    }
   }
 }

@@ -57,14 +57,33 @@ export async function POST(req: NextRequest) {
       case "get_all_data":
         // Debug endpoint
         console.log("Getting all training data...")
-        const allData = TrainingService.getAllTrainingData()
+        const allData = await TrainingService.getAllTrainingData()
         return NextResponse.json({ success: true, data: allData })
 
       case "clear_all_data":
         // Debug endpoint
         console.log("Clearing all training data...")
-        TrainingService.clearAllTrainingData()
+        await TrainingService.clearAllTrainingData()
         return NextResponse.json({ success: true, message: "All training data cleared" })
+
+      case "export_data":
+        console.log("Exporting training data...")
+        const exportData = await TrainingService.exportTrainingData()
+        return NextResponse.json({
+          success: true,
+          data: exportData,
+          message: "Training data exported successfully",
+        })
+
+      case "import_data":
+        console.log("Importing training data...")
+        const importResult = await TrainingService.importTrainingData(data.jsonData)
+        return NextResponse.json({
+          success: true,
+          imported: importResult.imported,
+          errors: importResult.errors,
+          message: `Import completed: ${importResult.imported} entries imported, ${importResult.errors} errors`,
+        })
 
       default:
         console.error("Invalid action:", action)
