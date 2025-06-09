@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState, useCallback, useContext } from "react"
+import { useState, useCallback } from "react"
 import { useDropzone } from "react-dropzone"
 import { usePapaParse } from "react-papaparse"
-import { AppContext } from "../AppContext"
+import { useInstall } from "../context/InstallContext"
 
 interface WireDetectionProps {
   onAnalysisComplete: (result: any) => void
@@ -15,7 +15,7 @@ const WireDetection: React.FC<WireDetectionProps> = ({ onAnalysisComplete, onUse
   const { readRemoteFile } = usePapaParse()
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [analysisResult, setAnalysisResult] = useState<any>(null)
-  const { dispatch } = useContext(AppContext)
+  const { dispatch } = useInstall()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setCsvFile(acceptedFiles[0])
