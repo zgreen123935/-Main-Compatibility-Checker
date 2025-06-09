@@ -97,8 +97,11 @@ export function InteractiveTraining({
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
-    // Increase click tolerance for easier selection
-    const tolerance = 10 // Increased from 8 to 10 for even better usability
+    console.log(`Clicked at: ${x.toFixed(2)}%, ${y.toFixed(2)}%`)
+    console.log(`Current terminal: ${selectedTerminal}`)
+    console.log(`Current points before click:`, clickPoints)
+
+    const tolerance = 10
 
     // Check if clicking on existing point to remove it
     const existingPointIndex = clickPoints.findIndex(
@@ -107,20 +110,27 @@ export function InteractiveTraining({
 
     if (existingPointIndex !== -1) {
       // Remove existing point
-      const newPoints = clickPoints.filter((_, index) => index !== existingPointIndex)
-      setClickPoints(newPoints)
-      logClickPoints(newPoints)
+      console.log(`Removing point at index ${existingPointIndex}`)
+      setClickPoints((prevPoints) => {
+        const newPoints = prevPoints.filter((_, index) => index !== existingPointIndex)
+        console.log(`Points after removal:`, newPoints)
+        return newPoints
+      })
     } else {
-      // Add new point - ALLOW multiple terminals with same name
+      // Add new point
       const newPoint: ClickPoint = {
         x,
         y,
         terminal: selectedTerminal,
         wireColor: selectedWireColor,
       }
-      const newPoints = [...clickPoints, newPoint]
-      setClickPoints(newPoints)
-      logClickPoints(newPoints)
+      console.log(`Adding new point:`, newPoint)
+
+      setClickPoints((prevPoints) => {
+        const newPoints = [...prevPoints, newPoint]
+        console.log(`Points after addition:`, newPoints)
+        return newPoints
+      })
     }
   }
 
@@ -315,7 +325,11 @@ export function InteractiveTraining({
                       return (
                         <button
                           key={terminal}
-                          onClick={() => setSelectedTerminal(terminal)}
+                          onClick={() => {
+                            console.log(`Selecting terminal: ${terminal}`)
+                            console.log(`Current points when selecting terminal:`, clickPoints)
+                            setSelectedTerminal(terminal)
+                          }}
                           className={`px-3 py-2 rounded-lg text-sm font-medium relative ${
                             selectedTerminal === terminal
                               ? "bg-[#BAE5D4] text-[#2D2D2D] border-2 border-[#2D2D2D]"
@@ -331,6 +345,21 @@ export function InteractiveTraining({
                         </button>
                       )
                     })}
+                  </div>
+
+                  {/* Debug info */}
+                  <div className="mt-2 p-2 bg-gray-100 rounded text-xs">
+                    <div>
+                      <strong>Debug Info:</strong>
+                    </div>
+                    <div>Selected Terminal: {selectedTerminal}</div>
+                    <div>Total Points: {clickPoints.length}</div>
+                    <div>
+                      Points:{" "}
+                      {JSON.stringify(
+                        clickPoints.map((p) => ({ terminal: p.terminal, x: p.x.toFixed(1), y: p.y.toFixed(1) })),
+                      )}
+                    </div>
                   </div>
                 </div>
 
