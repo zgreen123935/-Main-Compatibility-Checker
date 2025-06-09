@@ -205,14 +205,36 @@ export function InteractiveTraining({
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  <strong>Instructions:</strong>
-                  <br />• Select a terminal name and wire color below
-                  <br />• Click directly on each wire connection in the image
-                  <br />• You can mark multiple wires with the same terminal (e.g., multiple R connections)
-                  <br />• Click on existing points to remove them
-                  <br />• Change terminal/color selection and continue marking
+                  <strong>Training Steps:</strong>
+                  <br />• <strong>Step 1:</strong> Select a terminal name below (e.g., "R")
+                  <br />• <strong>Step 2:</strong> Click on that terminal's wire in the image
+                  <br />• <strong>Step 3:</strong> Select a DIFFERENT terminal name (e.g., "Y1")
+                  <br />• <strong>Step 4:</strong> Click on that terminal's wire in the image
+                  <br />• <strong>Repeat:</strong> Continue until you've marked ALL visible wire connections
+                  <br />• <strong>Remove:</strong> Click on existing green dots to remove them
                 </p>
               </div>
+
+              <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-2 mb-3">
+                <p className="text-sm font-medium text-yellow-800">
+                  🎯 Currently selecting: <strong>{selectedTerminal}</strong> ({selectedWireColor})
+                  <br />
+                  Click on the <strong>{selectedTerminal}</strong> terminal's wire connection in the image above
+                </p>
+              </div>
+
+              {clickPoints.length > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-3">
+                  <h5 className="font-medium text-green-800 mb-2">✅ Marked Connections:</h5>
+                  <div className="flex flex-wrap gap-1">
+                    {clickPoints.map((point, index) => (
+                      <span key={index} className="bg-green-200 text-green-800 px-2 py-1 rounded text-xs">
+                        {point.terminal} ({point.wireColor})
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div
                 ref={containerRef}
