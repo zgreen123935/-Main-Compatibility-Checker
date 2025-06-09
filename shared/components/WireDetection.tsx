@@ -110,4 +110,4 @@ const WireDetection: React.FC<WireDetectionProps> = ({ onAnalysisComplete, onUse
   )
 }
 
-export default WireDetection
+export { WireDetection }
