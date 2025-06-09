@@ -84,6 +84,12 @@ export function InteractiveTraining({
     { name: "gray", hex: "#6b7280" },
   ]
 
+  // Add this function near the top of the component to help with debugging
+  const logClickPoints = (points: ClickPoint[]) => {
+    console.log("Current click points:", points)
+  }
+
+  // Modify the handleImageClick function to ensure it's properly adding points
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current || !containerRef.current) return
 
@@ -92,7 +98,7 @@ export function InteractiveTraining({
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
     // Increase click tolerance for easier selection
-    const tolerance = 8 // Increased from 5 to 8 for better usability
+    const tolerance = 10 // Increased from 8 to 10 for even better usability
 
     // Check if clicking on existing point to remove it
     const existingPointIndex = clickPoints.findIndex(
@@ -101,24 +107,30 @@ export function InteractiveTraining({
 
     if (existingPointIndex !== -1) {
       // Remove existing point
-      setClickPoints((prev) => prev.filter((_, index) => index !== existingPointIndex))
+      const newPoints = clickPoints.filter((_, index) => index !== existingPointIndex)
+      setClickPoints(newPoints)
+      logClickPoints(newPoints)
     } else {
       // Add new point - ALLOW multiple terminals with same name
-      // This is important for training accuracy
       const newPoint: ClickPoint = {
         x,
         y,
         terminal: selectedTerminal,
         wireColor: selectedWireColor,
       }
-      setClickPoints((prev) => [...prev, newPoint])
+      const newPoints = [...clickPoints, newPoint]
+      setClickPoints(newPoints)
+      logClickPoints(newPoints)
     }
   }
 
+  // Modify the handleSubmitTraining function to ensure it's properly collecting all points
   const handleSubmitTraining = async () => {
     setIsSubmitting(true)
 
     try {
+      console.log("Submitting training with points:", clickPoints)
+
       // Create corrected wire connections
       const correctedConnections: WireConnection[] = clickPoints.map((point) => ({
         terminal: point.terminal,
@@ -155,7 +167,7 @@ export function InteractiveTraining({
         console.log("Interactive training data submitted successfully")
       }
 
-      // Return the corrected wires
+      // Return the corrected wires - make sure we're getting ALL terminals
       const correctedWires = clickPoints.map((point) => point.terminal)
       onComplete([...new Set(correctedWires)]) // Remove duplicates
     } catch (error) {

@@ -115,7 +115,12 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
   }
 
   const handleTrainingComplete = (correctedWires: string[]) => {
-    setSelectedWires(correctedWires)
+    // Save the selected wires without resetting previous selections
+    setSelectedWires((prev) => {
+      // Combine previous selections with new ones, removing duplicates
+      const combined = [...new Set([...prev, ...correctedWires])]
+      return combined
+    })
     setShowInteractiveTraining(false)
     onWiresDetected(correctedWires)
   }
