@@ -1,34 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { TrainingService } from "../../shared/services/trainingService"
-
-interface TrainingData {
-  id: string
-  imageUrl: string
-  imageHash: string
-  userVerifiedConnections: WireConnection[]
-  aiDetectedConnections: WireConnection[]
-  systemType: "heat-pump" | "conventional" | "unknown"
-  thermostatBrand?: string
-  thermostatModel?: string
-  imageQuality: "excellent" | "good" | "fair" | "poor"
-  timestamp: number
-  userFeedback?: string
-  isComplete?: boolean
-  correctionType?: string
-}
-
-interface WireConnection {
-  terminal: string
-  hasWire: boolean
-  wireColor?: string
-  confidence: number
-}
-
-// In a real app, this would be a proper database
-// const trainingDatabase: TrainingData[] = []
+import { TrainingService } from "../../../shared/services/trainingService"
 
 export async function POST(req: NextRequest) {
   try {
+    console.log("Wire training API called")
+
     const body = await req.json()
     const { action, data } = body
 
@@ -36,6 +12,7 @@ export async function POST(req: NextRequest) {
 
     switch (action) {
       case "submit_training":
+        console.log("Submitting training data...")
         const submitResult = await TrainingService.submitTrainingData(data)
         return NextResponse.json({
           success: true,
@@ -45,6 +22,7 @@ export async function POST(req: NextRequest) {
         })
 
       case "save_partial":
+        console.log("Saving partial training data...")
         const partialResult = await TrainingService.savePartialTrainingData(data)
         return NextResponse.json({
           success: true,
@@ -54,6 +32,7 @@ export async function POST(req: NextRequest) {
         })
 
       case "get_exact_match":
+        console.log("Getting exact match for hash:", data.imageHash)
         const exactMatch = await TrainingService.getExactImageMatch(data.imageHash)
         return NextResponse.json({
           success: true,
@@ -62,6 +41,7 @@ export async function POST(req: NextRequest) {
         })
 
       case "get_similar":
+        console.log("Getting similar images...")
         const similarImages = await TrainingService.getSimilarImages(data.detectedTerminals, data.systemType)
         return NextResponse.json({
           success: true,
@@ -70,26 +50,42 @@ export async function POST(req: NextRequest) {
         })
 
       case "get_stats":
+        console.log("Getting training stats...")
         const stats = await TrainingService.getTrainingStats()
         return NextResponse.json({ success: true, stats })
 
       case "get_all_data":
         // Debug endpoint
+        console.log("Getting all training data...")
         const allData = TrainingService.getAllTrainingData()
         return NextResponse.json({ success: true, data: allData })
 
       case "clear_all_data":
         // Debug endpoint
+        console.log("Clearing all training data...")
         TrainingService.clearAllTrainingData()
         return NextResponse.json({ success: true, message: "All training data cleared" })
 
       default:
+        console.error("Invalid action:", action)
         return NextResponse.json({ error: "Invalid action" }, { status: 400 })
     }
   } catch (error) {
     console.error("Training API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+
+    // Return more detailed error information
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const errorStack = error instanceof Error ? error.stack : "No stack trace"
+
+    console.error("Error details:", { message: errorMessage, stack: errorStack })
+
+    return NextResponse.json(
+      {
+        error: "Internal server error",
+        details: errorMessage,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 500 },
+    )
   }
 }
-
-// Removed local functions as they are now handled by TrainingService

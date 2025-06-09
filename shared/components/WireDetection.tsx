@@ -42,6 +42,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
   const [ocrComplete, setOcrComplete] = useState(false)
   const [showInteractiveTraining, setShowInteractiveTraining] = useState(false)
   const [originalFile, setOriginalFile] = useState<File | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
     setOriginalFile(file)
     const url = URL.createObjectURL(file)
     setPreviewUrl(url)
+    setErrorMessage(null)
 
     if (trainingMode) {
       // In training mode, go directly to interactive training
@@ -74,18 +76,27 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
 
   const processImage = async (file: File) => {
     setIsProcessing(true)
+    setErrorMessage(null)
 
     try {
+      console.log("Starting image processing...")
+
       const formData = new FormData()
       formData.append("image", file)
+
+      console.log("Sending request to /api/analyze-wiring...")
 
       const response = await fetch("/api/analyze-wiring", {
         method: "POST",
         body: formData,
       })
 
+      console.log("Response status:", response.status)
+
       if (response.ok) {
         const result = await response.json()
+        console.log("Analysis result:", result)
+
         setAnalysisResult(result)
 
         // Notify parent of system type detection
@@ -93,17 +104,22 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
           onSystemDetected(result.systemType)
         }
       } else {
-        throw new Error("Analysis failed")
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+        console.error("API error:", errorData)
+        throw new Error(errorData.details || errorData.error || "Analysis failed")
       }
     } catch (error) {
       console.error("Analysis error:", error)
+      const errorMsg = error instanceof Error ? error.message : "Analysis failed"
+      setErrorMessage(errorMsg)
+
       setAnalysisResult({
         detectedTerminals: [],
         wireConnections: [],
         connectedWires: [],
         confidence: 0,
         isThermostatImage: false,
-        reasons: ["Analysis failed. Please use interactive training to correct."],
+        reasons: [`Analysis failed: ${errorMsg}. Please use interactive training to correct.`],
         imageHash: "",
         trainingSource: "ai_only",
       })
@@ -138,6 +154,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
     setOcrComplete(false)
     setSelectedWires([])
     setShowInteractiveTraining(false)
+    setErrorMessage(null)
   }
 
   const getConfidenceColor = (confidence: number) => {
@@ -148,6 +165,30 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
 
   const renderAnalysisResult = () => {
     if (!analysisResult) return null
+
+    // Handle error case
+    if (errorMessage) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <h4 className="font-medium text-red-800 mb-2">❌ Analysis Error</h4>
+          <p className="text-red-700 text-sm mb-3">{errorMessage}</p>
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={handleStartTraining}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+            >
+              🎯 Use Interactive Training
+            </button>
+            <button
+              onClick={triggerFileInput}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm"
+            >
+              📷 Try Another Photo
+            </button>
+          </div>
+        </div>
+      )
+    }
 
     // Handle exact match case
     if (analysisResult.trainingSource === "exact_match" && analysisResult.exactMatch) {
@@ -332,7 +373,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
 
       {!showInteractiveTraining && !trainingMode && (
         <div className="flex flex-col gap-3">
-          {analysisResult && selectedWires.length > 0 ? (
+          {analysisResult && selectedWires.length > 0 && !errorMessage ? (
             <InstallButton
               title={`Continue with ${selectedWires.length} Selected Wires`}
               onPress={handleQuickConfirm}
