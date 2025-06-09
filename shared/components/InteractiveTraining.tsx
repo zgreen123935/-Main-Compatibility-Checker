@@ -91,14 +91,20 @@ export function InteractiveTraining({
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
+    // Increase click tolerance for easier selection
+    const tolerance = 8 // Increased from 5 to 8 for better usability
+
     // Check if clicking on existing point to remove it
-    const existingPointIndex = clickPoints.findIndex((point) => Math.abs(point.x - x) < 5 && Math.abs(point.y - y) < 5)
+    const existingPointIndex = clickPoints.findIndex(
+      (point) => Math.abs(point.x - x) < tolerance && Math.abs(point.y - y) < tolerance,
+    )
 
     if (existingPointIndex !== -1) {
       // Remove existing point
       setClickPoints((prev) => prev.filter((_, index) => index !== existingPointIndex))
     } else {
-      // Add new point - allow multiple terminals with same name
+      // Add new point - ALLOW multiple terminals with same name
+      // This is important for training accuracy
       const newPoint: ClickPoint = {
         x,
         y,
@@ -186,12 +192,25 @@ export function InteractiveTraining({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Image Section */}
             <div>
-              <h4 className="font-medium text-[#2D2D2D] mb-3">Click on wire connections in the image:</h4>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-medium text-[#2D2D2D]">Click on wire connections in the image:</h4>
+                <button
+                  onClick={() => setClickPoints([])}
+                  className="text-sm text-red-600 hover:text-red-800 underline"
+                  disabled={clickPoints.length === 0}
+                >
+                  Clear All ({clickPoints.length})
+                </button>
+              </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700">
-                  <strong>Instructions:</strong> Click directly on each terminal that has a wire connected. Click again
-                  to remove a point. Select the terminal name and wire color before clicking.
+                  <strong>Instructions:</strong>
+                  <br />• Select a terminal name and wire color below
+                  <br />• Click directly on each wire connection in the image
+                  <br />• You can mark multiple wires with the same terminal (e.g., multiple R connections)
+                  <br />• Click on existing points to remove them
+                  <br />• Change terminal/color selection and continue marking
                 </p>
               </div>
 
@@ -234,8 +253,18 @@ export function InteractiveTraining({
                 ))}
               </div>
 
-              <div className="mt-3 text-sm text-gray-600">
-                Marked connections: {clickPoints.length} | Selected wires: {getSelectedWires().join(", ") || "None"}
+              <div className="mt-3 text-sm">
+                <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <span className="text-gray-600">
+                    <strong>Total connections marked:</strong> {clickPoints.length}
+                  </span>
+                  <span className="text-gray-600">
+                    <strong>Unique terminals:</strong> {getSelectedWires().length}
+                  </span>
+                </div>
+                <div className="mt-1 text-xs text-gray-500">
+                  Terminals: {getSelectedWires().join(", ") || "None selected"}
+                </div>
               </div>
             </div>
 
@@ -261,7 +290,7 @@ export function InteractiveTraining({
                         >
                           {terminal}
                           {count > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                            <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
                               {count}
                             </span>
                           )}
