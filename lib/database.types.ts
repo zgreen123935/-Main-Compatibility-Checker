@@ -10,6 +10,7 @@ export interface Database {
           image_hash: string
           image_url: string
           user_verified_connections: Json
+          jumper_connections: Json
           ai_detected_connections: Json
           system_type: string
           thermostat_brand: string | null
@@ -27,6 +28,7 @@ export interface Database {
           image_hash: string
           image_url: string
           user_verified_connections: Json
+          jumper_connections?: Json
           ai_detected_connections: Json
           system_type: string
           thermostat_brand?: string | null
@@ -44,6 +46,7 @@ export interface Database {
           image_hash?: string
           image_url?: string
           user_verified_connections?: Json
+          jumper_connections?: Json
           ai_detected_connections?: Json
           system_type?: string
           thermostat_brand?: string | null

@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS training_data (
   image_hash TEXT NOT NULL,
   image_url TEXT NOT NULL,
   user_verified_connections JSONB NOT NULL,
+  jumper_connections JSONB DEFAULT '[]'::jsonb,
   ai_detected_connections JSONB NOT NULL,
   system_type TEXT NOT NULL,
   thermostat_brand TEXT,
@@ -16,6 +17,9 @@ CREATE TABLE IF NOT EXISTS training_data (
   confidence_score FLOAT,
   metadata JSONB
 );
+
+-- Add jumper_connections column if it doesn't exist (for existing tables)
+ALTER TABLE training_data ADD COLUMN IF NOT EXISTS jumper_connections JSONB DEFAULT '[]'::jsonb;
 
 -- Create index on image_hash for fast lookups
 CREATE INDEX IF NOT EXISTS idx_training_data_image_hash ON training_data(image_hash);
