@@ -38,6 +38,16 @@ interface SavedConnection {
   y: number
 }
 
+interface JumperConnection {
+  id: string
+  fromTerminal: string
+  toTerminal: string
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
 export function InteractiveTraining({
   imageFile,
   imageUrl,
@@ -47,6 +57,11 @@ export function InteractiveTraining({
 }: InteractiveTrainingProps) {
   const [clickPoints, setClickPoints] = useState<ClickPoint[]>([])
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
+  const [jumperConnections, setJumperConnections] = useState<JumperConnection[]>([])
+  const [isAddingJumper, setIsAddingJumper] = useState(false)
+  const [jumperFirstTerminal, setJumperFirstTerminal] = useState<{ terminal: string; x: number; y: number } | null>(
+    null,
+  )
   const [selectedTerminal, setSelectedTerminal] = useState("R")
   const [selectedWireColor, setSelectedWireColor] = useState("red")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -125,6 +140,7 @@ export function InteractiveTraining({
           x: conn.x,
           y: conn.y,
         })),
+        jumperConnections: jumperConnections,
         aiDetectedConnections: initialDetection?.wireConnections || [],
         systemType,
         imageQuality,
@@ -158,6 +174,29 @@ export function InteractiveTraining({
     await savePartialTrainingData()
   }
 
+  const toggleJumperMode = () => {
+    setIsAddingJumper(!isAddingJumper)
+    setJumperFirstTerminal(null)
+  }
+
+  const removeConnection = (id: string) => {
+    setSavedConnections((prev) => prev.filter((conn) => conn.id !== id))
+    setClickPoints((prev) => prev.filter((point) => point.id !== id))
+  }
+
+  const removeJumper = (id: string) => {
+    setJumperConnections((prev) => prev.filter((conn) => conn.id !== id))
+  }
+
+  const clearAllConnections = () => {
+    setSavedConnections([])
+    setClickPoints([])
+  }
+
+  const clearAllJumpers = () => {
+    setJumperConnections([])
+  }
+
   const handleImageClick = (event: React.MouseEvent<HTMLImageElement>) => {
     if (!imageRef.current || !containerRef.current) return
 
@@ -165,6 +204,35 @@ export function InteractiveTraining({
     const x = ((event.clientX - rect.left) / rect.width) * 100
     const y = ((event.clientY - rect.top) / rect.height) * 100
 
+    if (isAddingJumper) {
+      // Handle jumper creation
+      if (!jumperFirstTerminal) {
+        // First click - select first terminal
+        setJumperFirstTerminal({
+          terminal: selectedTerminal,
+          x,
+          y,
+        })
+      } else {
+        // Second click - create jumper
+        const newJumper: JumperConnection = {
+          id: generateId(),
+          fromTerminal: jumperFirstTerminal.terminal,
+          toTerminal: selectedTerminal,
+          x1: jumperFirstTerminal.x,
+          y1: jumperFirstTerminal.y,
+          x2: x,
+          y2: y,
+        }
+
+        setJumperConnections((prev) => [...prev, newJumper])
+        setJumperFirstTerminal(null)
+        console.log(`Added jumper: ${newJumper.fromTerminal} to ${newJumper.toTerminal}`)
+      }
+      return
+    }
+
+    // Regular wire connection handling (existing code)
     const newConnection: SavedConnection = {
       terminal: selectedTerminal,
       wireColor: selectedWireColor,
@@ -186,16 +254,6 @@ export function InteractiveTraining({
     setClickPoints((prev) => [...prev, newPoint])
 
     console.log(`Added connection: ${selectedTerminal} at ${x.toFixed(1)}%, ${y.toFixed(1)}%`)
-  }
-
-  const removeConnection = (id: string) => {
-    setSavedConnections((prev) => prev.filter((conn) => conn.id !== id))
-    setClickPoints((prev) => prev.filter((point) => point.id !== id))
-  }
-
-  const clearAllConnections = () => {
-    setSavedConnections([])
-    setClickPoints([])
   }
 
   const calculateAIAccuracy = (aiPredictions: string[], userSelections: string[]) => {
@@ -246,6 +304,7 @@ export function InteractiveTraining({
         imageUrl,
         imageHash: initialDetection?.imageHash || "unknown",
         userVerifiedConnections: correctedConnections,
+        jumperConnections: jumperConnections,
         aiDetectedConnections: initialDetection?.wireConnections || [],
         systemType,
         imageQuality,
@@ -306,6 +365,13 @@ export function InteractiveTraining({
 
   const getUniqueTerminals = () => {
     const terminals = savedConnections.map((conn) => conn.terminal)
+
+    // Add terminals from jumpers
+    jumperConnections.forEach((jumper) => {
+      terminals.push(jumper.fromTerminal)
+      terminals.push(jumper.toTerminal)
+    })
+
     return [...new Set(terminals)]
   }
 
@@ -453,6 +519,45 @@ export function InteractiveTraining({
                     </div>
                   </div>
                 ))}
+
+                {/* Overlay jumper connections */}
+                {jumperConnections.map((jumper) => (
+                  <div key={jumper.id} className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                    <svg className="absolute top-0 left-0 w-full h-full">
+                      <line
+                        x1={`${jumper.x1}%`}
+                        y1={`${jumper.y1}%`}
+                        x2={`${jumper.x2}%`}
+                        y2={`${jumper.y2}%`}
+                        stroke="#FFA500"
+                        strokeWidth="3"
+                        strokeDasharray="5,3"
+                      />
+                    </svg>
+                    <div
+                      className="absolute transform -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-xs px-2 py-1 rounded"
+                      style={{
+                        left: `${(jumper.x1 + jumper.x2) / 2}%`,
+                        top: `${(jumper.y1 + jumper.y2) / 2}%`,
+                      }}
+                    >
+                      Jumper: {jumper.fromTerminal} → {jumper.toTerminal}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Jumper first point indicator */}
+                {jumperFirstTerminal && (
+                  <div
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{
+                      left: `${jumperFirstTerminal.x}%`,
+                      top: `${jumperFirstTerminal.y}%`,
+                    }}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white animate-pulse" />
+                  </div>
+                )}
               </div>
 
               <div className="mt-3 text-sm">
@@ -520,6 +625,62 @@ export function InteractiveTraining({
                         {color.name}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#2D2D2D] mb-2">Jumper Connections:</label>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={toggleJumperMode}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+                        isAddingJumper ? "bg-amber-500 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      {isAddingJumper ? "✏️ Adding Jumper..." : "➕ Add Jumper Wire"}
+                    </button>
+
+                    {isAddingJumper && (
+                      <div className="bg-amber-100 border border-amber-300 rounded-lg p-2">
+                        <p className="text-sm text-amber-800">
+                          {!jumperFirstTerminal
+                            ? "Step 1: Select first terminal and click on image"
+                            : `Step 2: Select second terminal (from ${jumperFirstTerminal.terminal}) and click on image`}
+                        </p>
+                      </div>
+                    )}
+
+                    {jumperConnections.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <h5 className="font-medium text-amber-800">🔌 Jumper Connections:</h5>
+                          <button
+                            onClick={clearAllJumpers}
+                            className="text-xs text-red-600 hover:text-red-800 underline"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        <div className="space-y-1">
+                          {jumperConnections.map((jumper) => (
+                            <div
+                              key={jumper.id}
+                              className="flex items-center justify-between bg-white rounded px-2 py-1"
+                            >
+                              <span className="text-sm">
+                                <strong>{jumper.fromTerminal}</strong> → <strong>{jumper.toTerminal}</strong>
+                              </span>
+                              <button
+                                onClick={() => removeJumper(jumper.id)}
+                                className="text-red-600 hover:text-red-800 text-sm font-bold"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

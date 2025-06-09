@@ -25,6 +25,7 @@ interface AnalysisResult {
   detectedTerminals: string[]
   wireConnections: WireConnection[]
   connectedWires: string[]
+  jumperConnections?: { fromTerminal: string; toTerminal: string }[]
   confidence: number
   isThermostatImage: boolean
   reasons: string[]
@@ -159,6 +160,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
             x: 50 + index * 5,
             y: 50 + index * 5,
           })),
+          jumperConnections: analysisResult.jumperConnections || [],
           aiDetectedConnections: analysisResult.wireConnections || [],
           systemType: analysisResult.systemType || "unknown",
           imageQuality: "good",
@@ -298,6 +300,19 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
                 {analysisResult.connectedWires.map((wire) => (
                   <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium">
                     {wire}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {analysisResult.jumperConnections && analysisResult.jumperConnections.length > 0 && (
+            <div className="mb-3">
+              <strong className="text-amber-800">Detected jumpers:</strong>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {analysisResult.jumperConnections.map((jumper, idx) => (
+                  <span key={idx} className="bg-amber-200 text-amber-800 px-2 py-1 rounded-full text-xs font-medium">
+                    {jumper.fromTerminal} → {jumper.toTerminal}
                   </span>
                 ))}
               </div>

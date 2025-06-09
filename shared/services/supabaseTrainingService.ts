@@ -13,6 +13,15 @@ interface WireConnection {
   y?: number
 }
 
+interface JumperConnection {
+  fromTerminal: string
+  toTerminal: string
+  x1?: number
+  y1?: number
+  x2?: number
+  y2?: number
+}
+
 export class SupabaseTrainingService {
   private static supabase = createServerComponentClient()
 
@@ -128,6 +137,7 @@ export class SupabaseTrainingService {
         image_hash: data.imageHash,
         image_url: data.imageUrl,
         user_verified_connections: data.userVerifiedConnections || [],
+        jumper_connections: data.jumperConnections || [],
         ai_detected_connections: data.aiDetectedConnections || [],
         system_type: data.systemType || "unknown",
         thermostat_brand: data.thermostatBrand,
@@ -194,6 +204,7 @@ export class SupabaseTrainingService {
         image_hash: data.imageHash,
         image_url: data.imageUrl,
         user_verified_connections: data.userVerifiedConnections || [],
+        jumper_connections: data.jumperConnections || [],
         ai_detected_connections: data.aiDetectedConnections || [],
         system_type: data.systemType || "unknown",
         thermostat_brand: data.thermostatBrand,
