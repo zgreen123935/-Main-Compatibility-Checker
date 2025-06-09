@@ -30,6 +30,8 @@ interface AnalysisResult {
   reasons: string[]
   imageHash: string
   similarConfigurations?: any[]
+  exactMatch?: any
+  trainingSource?: "exact_match" | "similar_images" | "ai_only"
 }
 
 export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, onSystemDetected }: WireDetectionProps) {
@@ -103,6 +105,7 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
         isThermostatImage: false,
         reasons: ["Analysis failed. Please use interactive training to correct."],
         imageHash: "",
+        trainingSource: "ai_only",
       })
     } finally {
       setIsProcessing(false)
@@ -143,6 +146,114 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
     return "text-red-600"
   }
 
+  const renderAnalysisResult = () => {
+    if (!analysisResult) return null
+
+    // Handle exact match case
+    if (analysisResult.trainingSource === "exact_match" && analysisResult.exactMatch) {
+      return (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+          <h4 className="font-medium text-purple-800 mb-2">🎯 Exact Match Found!</h4>
+          <p className="text-purple-700 text-sm mb-3">
+            This exact image was previously trained on{" "}
+            {new Date(analysisResult.exactMatch.timestamp).toLocaleDateString()}. Using your previous selections.
+          </p>
+
+          {analysisResult.connectedWires.length > 0 && (
+            <div className="mb-3">
+              <strong className="text-purple-800">Your previous training:</strong>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {analysisResult.connectedWires.map((wire) => (
+                  <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium">
+                    {wire}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={handleQuickConfirm}
+              className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm"
+            >
+              ✓ Use Previous Training
+            </button>
+            <button
+              onClick={handleStartTraining}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+            >
+              🎯 Retrain This Image
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    // Handle AI detection with similarity matching
+    if (analysisResult.confidence > 50) {
+      return (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+          <h4 className="font-medium text-green-800 mb-2">
+            ✅ Detection Results
+            {analysisResult.trainingSource === "similar_images" && " (Enhanced by Training Data)"}
+          </h4>
+          <p className="text-green-700 text-sm mb-3">
+            Confidence: {analysisResult.confidence}% | Found {analysisResult.connectedWires.length} wire connections
+            {analysisResult.similarConfigurations &&
+              analysisResult.similarConfigurations.length > 0 &&
+              ` | Based on ${analysisResult.similarConfigurations.length} similar trained images`}
+          </p>
+
+          {analysisResult.connectedWires.length > 0 && (
+            <div className="mb-3">
+              <strong className="text-green-800">Detected wires:</strong>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {analysisResult.connectedWires.map((wire) => (
+                  <span key={wire} className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium">
+                    {wire}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2 justify-center">
+            <button
+              onClick={handleQuickConfirm}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
+            >
+              ✓ Looks Correct
+            </button>
+            <button
+              onClick={handleStartTraining}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+            >
+              🎯 Correct & Train
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    // Handle low confidence detection
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+        <h4 className="font-medium text-yellow-800 mb-2">⚠️ Low Confidence Detection</h4>
+        <p className="text-yellow-700 text-sm mb-3">
+          Detection confidence: {analysisResult.confidence}%. Please help train the AI by marking the correct
+          connections.
+        </p>
+        <button
+          onClick={handleStartTraining}
+          className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
+        >
+          🎯 Start Interactive Training
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8">
       <h3 className="text-xl font-medium text-[#2D2D2D] mb-4">
@@ -157,7 +268,8 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
           </p>
         ) : (
           <p className="text-[#4B5563] mb-4">
-            Upload a photo and our AI will automatically detect wire connections. You can review and correct if needed.
+            Upload a photo and our AI will automatically detect wire connections. If you've trained this image before,
+            we'll remember your previous selections!
           </p>
         )}
 
@@ -188,63 +300,11 @@ export function WireDetection({ onWiresDetected, onSkip, trainingMode = false, o
               <div className="flex flex-col items-center">
                 <div className="w-8 h-8 border-4 border-[#BAE5D4] border-t-transparent rounded-full animate-spin mb-2"></div>
                 <p className="text-[#4B5563]">Analyzing image with AI...</p>
+                <p className="text-sm text-[#6B7280]">Checking for previous training data...</p>
               </div>
             ) : ocrComplete && analysisResult && !trainingMode ? (
               <div>
-                {analysisResult.confidence > 50 ? (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-green-800 mb-2">✅ Detection Results</h4>
-                    <p className="text-green-700 text-sm mb-3">
-                      Confidence: {analysisResult.confidence}% | Found {analysisResult.connectedWires.length} wire
-                      connections
-                    </p>
-
-                    {analysisResult.connectedWires.length > 0 && (
-                      <div className="mb-3">
-                        <strong className="text-green-800">Detected wires:</strong>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {analysisResult.connectedWires.map((wire) => (
-                            <span
-                              key={wire}
-                              className="bg-[#BAE5D4] text-[#2D2D2D] px-2 py-1 rounded-full text-xs font-medium"
-                            >
-                              {wire}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 justify-center">
-                      <button
-                        onClick={handleQuickConfirm}
-                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm"
-                      >
-                        ✓ Looks Correct
-                      </button>
-                      <button
-                        onClick={handleStartTraining}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
-                      >
-                        🎯 Correct & Train
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-yellow-800 mb-2">⚠️ Low Confidence Detection</h4>
-                    <p className="text-yellow-700 text-sm mb-3">
-                      Detection confidence: {analysisResult.confidence}%. Please help train the AI by marking the
-                      correct connections.
-                    </p>
-                    <button
-                      onClick={handleStartTraining}
-                      className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm"
-                    >
-                      🎯 Start Interactive Training
-                    </button>
-                  </div>
-                )}
+                {renderAnalysisResult()}
 
                 <div className="flex gap-2 justify-center mt-3">
                   <button onClick={triggerFileInput} className="text-[#2D2D2D] underline text-sm">

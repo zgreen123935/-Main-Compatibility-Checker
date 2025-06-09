@@ -19,6 +19,8 @@ interface ImageAnalysis {
   suggestions: string[]
   imageHash: string
   similarConfigurations?: any[]
+  exactMatch?: any // Add exact match indicator
+  trainingSource?: "exact_match" | "similar_images" | "ai_only"
 }
 
 export async function POST(req: NextRequest) {
@@ -44,7 +46,9 @@ export async function POST(req: NextRequest) {
     const imageHash = await generateImageHash(buffer)
     const mimeType = file.type
 
-    // First, check if we have similar images in our training database
+    console.log(`Processing image with hash: ${imageHash}`)
+
+    // Enhanced analysis with exact match checking
     const analysis = await analyzeWithTrainingData(base64Image, mimeType, imageHash)
 
     return NextResponse.json({
@@ -62,20 +66,85 @@ async function analyzeWithTrainingData(
   mimeType: string,
   imageHash: string,
 ): Promise<ImageAnalysis> {
-  // First, get initial AI analysis
+  console.log(`Analyzing image with hash: ${imageHash}`)
+
+  // STEP 1: Check for exact image hash match first
+  const exactMatch = await getExactImageMatch(imageHash)
+
+  if (exactMatch) {
+    console.log(`Found exact match for image hash: ${imageHash}`)
+
+    // Use the user's previous training data directly
+    const userTrainedConnections = exactMatch.userVerifiedConnections || []
+    const connectedWires = userTrainedConnections
+      .filter((conn: WireConnection) => conn.hasWire)
+      .map((conn: WireConnection) => conn.terminal)
+
+    return {
+      detectedTerminals: connectedWires,
+      wireConnections: userTrainedConnections,
+      connectedWires,
+      systemType: exactMatch.systemType || "unknown",
+      confidence: 95, // High confidence since user previously trained this
+      isThermostatImage: true,
+      reasons: [
+        "Exact image match found in training database",
+        `Previously trained by user on ${new Date(exactMatch.timestamp).toLocaleDateString()}`,
+        `Found ${connectedWires.length} user-verified wire connections`,
+        "Using previous training data directly",
+      ],
+      suggestions: [
+        "This image was previously trained - using your previous selections",
+        "You can still modify the selections if needed",
+      ],
+      imageHash,
+      exactMatch,
+      trainingSource: "exact_match",
+    }
+  }
+
+  console.log(`No exact match found for hash: ${imageHash}, proceeding with AI analysis`)
+
+  // STEP 2: If no exact match, get initial AI analysis
   const aiAnalysis = await analyzeWithGPT4Vision(base64Image, mimeType)
 
-  // Then, look for similar configurations in our training database
+  // STEP 3: Look for similar configurations in training database
   const similarConfigs = await getSimilarConfigurations(aiAnalysis.detectedTerminals, aiAnalysis.systemType)
 
-  // Enhance the analysis with training data insights
+  // STEP 4: Enhance the analysis with training data insights
   const enhancedAnalysis = enhanceWithTrainingData(aiAnalysis, similarConfigs)
 
   return {
     ...enhancedAnalysis,
     imageHash,
     similarConfigurations: similarConfigs,
+    trainingSource: similarConfigs.length > 0 ? "similar_images" : "ai_only",
   }
+}
+
+// NEW: Function to get exact image match
+async function getExactImageMatch(imageHash: string) {
+  try {
+    console.log(`Looking for exact match with hash: ${imageHash}`)
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/wire-training`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "get_exact_match",
+        data: { imageHash },
+      }),
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log(`Exact match result:`, result)
+      return result.exactMatch || null
+    }
+  } catch (error) {
+    console.error("Failed to get exact image match:", error)
+  }
+  return null
 }
 
 async function analyzeWithGPT4Vision(base64Image: string, mimeType: string) {
@@ -211,7 +280,7 @@ Provide detailed JSON analysis:
 
 async function getSimilarConfigurations(detectedTerminals: string[], systemType: string) {
   try {
-    const response = await fetch("/api/wire-training", {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/api/wire-training`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
