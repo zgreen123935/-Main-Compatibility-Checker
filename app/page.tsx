@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Smartphone,
   Apple,
+  Thermometer,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -245,15 +246,112 @@ export default function CentralHVACManual() {
             {/* Part 1: Installation Instructions */}
             <div className="mb-12">
               <h3 className="text-2xl font-medium text-[#6B7280] mb-8">Installation Instructions</h3>
-              <div className="bg-white rounded-lg border p-8 mb-8">
-                <div className="text-center mb-6">
-                  <div className="text-4xl font-medium text-[#E91E63] mb-4">mysa</div>
-                  <p className="text-[#6B7280] mb-2">Mysa Installation and Compatibility Guide</p>
-                  <p className="text-[#6B7280] mb-6">Installation de Mysa et Guide de compatibilité</p>
-                  <Button className="bg-[#E91E63] hover:bg-[#d81b60] text-white px-8">
-                    Start <span className="ml-2 text-sm">press Enter ↵</span>
-                  </Button>
-                </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Conventional Heat/Cooling */}
+                <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
+                  <CardHeader className="bg-blue-50 border-b border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Thermometer className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
+                          Conventional Heat/Cooling
+                        </CardTitle>
+                        <CardDescription className="text-[#6B7280] text-sm">Standard HVAC Systems</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 flex-1 flex flex-col">
+                    <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
+                      Installation guide for traditional heating and cooling systems with separate heating and cooling
+                      equipment.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#6B7280]">View Guide</span>
+                      <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Heat Pump with Auxiliary Heat */}
+                <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
+                  <CardHeader className="bg-orange-50 border-b border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <Settings className="w-6 h-6 text-orange-600" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
+                          Heat Pump with Auxiliary Heat
+                        </CardTitle>
+                        <CardDescription className="text-[#6B7280] text-sm">Heat Pump + Backup Heat</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 flex-1 flex flex-col">
+                    <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
+                      Installation instructions for heat pump systems with auxiliary or emergency heating backup.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#6B7280]">View Guide</span>
+                      <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Boiler/Radiant System */}
+                <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
+                  <CardHeader className="bg-green-50 border-b border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <FileText className="w-6 h-6 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
+                          Boiler/Radiant System
+                        </CardTitle>
+                        <CardDescription className="text-[#6B7280] text-sm">Heat Only Systems</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 flex-1 flex flex-col">
+                    <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
+                      Installation guide for boiler and radiant heating systems that provide heat only.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#6B7280]">View Guide</span>
+                      <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Installing with C-Wire Adapter */}
+                <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
+                  <CardHeader className="bg-purple-50 border-b border-gray-200">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <AlertCircle className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
+                          Installing with C-Wire Adapter
+                        </CardTitle>
+                        <CardDescription className="text-[#6B7280] text-sm">Power Adapter Installation</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 flex-1 flex flex-col">
+                    <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
+                      Step-by-step guide for installing Mysa with a C-wire power adapter when no C-wire is available.
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-[#6B7280]">View Guide</span>
+                      <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
@@ -286,264 +384,6 @@ export default function CentralHVACManual() {
           </div>
 
           {/* Step-by-Step Installation Guide */}
-          <div className="mb-12">
-            <h3 className="text-2xl font-medium text-[#6B7280] text-center mb-8">Step-by-Step Installation</h3>
-
-            {/* Step 1: Safety First */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-red-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-red-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-red-600 font-bold text-xl">1</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Safety First - Turn Off Power</h4>
-                  <p className="text-[#6B7280] mb-4">
-                    Before beginning installation, turn off power to your HVAC system at the circuit breaker. This is
-                    critical for your safety.
-                  </p>
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <p className="text-red-700 font-medium">
-                      ⚠️ Warning: Working with electrical wiring can be dangerous. If you're not comfortable with
-                      electrical work, consult a qualified electrician.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 2: Remove Old Thermostat */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-blue-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-blue-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-blue-600 font-bold text-xl">2</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Remove Your Old Thermostat</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">
-                        Carefully remove your existing thermostat from the wall. Take a photo of the wiring before
-                        disconnecting anything.
-                      </p>
-                      <ul className="list-disc list-inside text-[#6B7280] space-y-2">
-                        <li>Remove the thermostat face plate</li>
-                        <li>Take a clear photo of wire connections</li>
-                        <li>Label each wire with the provided stickers</li>
-                        <li>Disconnect wires from old thermostat</li>
-                      </ul>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Remove+Old+Thermostat"
-                        alt="Removing old thermostat"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3: Check Your Wires */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-green-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-green-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-green-600 font-bold text-xl">3</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Identify Your Wires</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">Common wire types you might see:</p>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                          <span className="text-[#6B7280]">
-                            <strong>R</strong> - Power (24V)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                          <span className="text-[#6B7280]">
-                            <strong>C</strong> - Common (Required for Mysa)
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-white border-2 border-gray-400 rounded-full"></div>
-                          <span className="text-[#6B7280]">
-                            <strong>W</strong> - Heat
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-                          <span className="text-[#6B7280]">
-                            <strong>Y</strong> - Cool
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-                          <span className="text-[#6B7280]">
-                            <strong>G</strong> - Fan
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Wire+Identification"
-                        alt="Wire identification guide"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 4: Install Mysa Base */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-purple-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-purple-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-purple-600 font-bold text-xl">4</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Install the Mysa Base Plate</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">
-                        Mount the Mysa base plate to the wall using the provided screws.
-                      </p>
-                      <ol className="list-decimal list-inside text-[#6B7280] space-y-2">
-                        <li>Hold base plate against wall</li>
-                        <li>Mark screw holes with pencil</li>
-                        <li>Drill pilot holes if needed</li>
-                        <li>Secure base plate with screws</li>
-                        <li>Ensure base plate is level</li>
-                      </ol>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Install+Base+Plate"
-                        alt="Installing Mysa base plate"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 5: Connect Wires */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-orange-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-orange-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-orange-600 font-bold text-xl">5</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Connect Your Wires</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">
-                        Connect each wire to the corresponding terminal on your Mysa thermostat using the configuration
-                        code you found earlier.
-                      </p>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                        <p className="text-blue-700 font-medium">
-                          💡 Tip: Use the Configuration Code Finder above to determine the correct wiring for your
-                          system.
-                        </p>
-                      </div>
-                      <p className="text-[#6B7280] text-sm">
-                        Make sure all connections are secure and no bare wire is exposed.
-                      </p>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Wire+Connections"
-                        alt="Connecting wires to Mysa"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 6: Attach Mysa */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-teal-500">
-              <div className="flex items-start gap-6">
-                <div className="bg-teal-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-teal-600 font-bold text-xl">6</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Attach Mysa to Base Plate</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">
-                        Carefully attach your Mysa thermostat to the mounted base plate.
-                      </p>
-                      <ol className="list-decimal list-inside text-[#6B7280] space-y-2">
-                        <li>Gently tuck wires into wall opening</li>
-                        <li>Align Mysa with base plate</li>
-                        <li>Press firmly until it clicks into place</li>
-                        <li>Ensure Mysa sits flush against wall</li>
-                      </ol>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Attach+Mysa"
-                        alt="Attaching Mysa to base plate"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 7: Power On */}
-            <div className="bg-white rounded-lg p-8 mb-8 border-l-4 border-green-600">
-              <div className="flex items-start gap-6">
-                <div className="bg-green-100 rounded-full p-3 flex-shrink-0">
-                  <span className="text-green-600 font-bold text-xl">7</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="text-xl font-semibold text-[#2D2D2D] mb-4">Turn Power Back On</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <p className="text-[#6B7280] mb-4">
-                        Turn the power back on at your circuit breaker and check that Mysa powers up correctly.
-                      </p>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <p className="text-green-700 font-medium">
-                          ✅ Success: You should see Mysa's welcome screen light up!
-                        </p>
-                      </div>
-                    </div>
-                    <div className="bg-gray-100 rounded-lg p-4 flex items-center justify-center">
-                      <Image
-                        src="/placeholder.svg?height=200&width=300&text=Mysa+Powered+On"
-                        alt="Mysa thermostat powered on"
-                        width={300}
-                        height={200}
-                        className="rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* High Voltage Warning */}
           <div className="bg-[#E91E63] text-white rounded-lg p-8 mb-12">
