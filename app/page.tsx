@@ -298,6 +298,34 @@ export default function CentralHVACManual() {
               </div>
             </div>
 
+            {/* Mysa App Recommendation */}
+            <div className="mb-8">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                <div className="flex items-center justify-center gap-3 mb-3">
+                  <Smartphone className="w-6 h-6 text-blue-600" />
+                  <h4 className="text-lg font-medium text-[#2D2D2D]">Recommended Installation Method</h4>
+                </div>
+                <p className="text-[#4B5563] mb-4">
+                  Mysa recommends using the Mysa App for installation instructions and pairing.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
+                    <Image
+                      src="/placeholder.svg?height=20&width=20&text=Play"
+                      alt="Google Play"
+                      width={20}
+                      height={20}
+                    />
+                    Google Play
+                  </Button>
+                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
+                    <Apple className="w-4 h-4" />
+                    App Store
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Help with Installation */}
             <div className="mb-12">
               <Alert className="border-[#E91E63] bg-pink-50">
