@@ -514,7 +514,7 @@ export default function ConfigurationFinder() {
       heating: formData.wiring.W || formData.wiring.W2,
       cooling: formData.wiring.Y || formData.wiring.Y2,
       heatPump: formData.wiring.O || formData.wiring.B,
-      emergencyHeat: formData.wiring.E,
+      emergencyHeat: formData.wiring.E || (detectedCapabilities.heatPump && formData.wiring.W2 && !formData.wiring.Y2),
       fanControl: formData.wiring.G,
       stages: {
         heat: (formData.wiring.W ? 1 : 0) + (formData.wiring.W2 ? 1 : 0),
@@ -528,7 +528,7 @@ export default function ConfigurationFinder() {
       const detected = detectSystemType(formData.wiring)
       setDetectedSystemType(detected)
     }
-  }, [formData.wiring, formData.systemType])
+  }, [formData.wiring, formData.systemType, detectedCapabilities.heatPump])
 
   // Reset O and B wires when system type changes away from heat pump
   useEffect(() => {

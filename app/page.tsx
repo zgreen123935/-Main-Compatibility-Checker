@@ -1,828 +1,125 @@
-"use client"
-
 import Image from "next/image"
-import Link from "next/link"
-import { useState } from "react"
-import {
-  ChevronDown,
-  MapPin,
-  ShoppingCart,
-  FileText,
-  Settings,
-  AlertCircle,
-  Menu,
-  X,
-  Search,
-  ArrowRight,
-  Smartphone,
-  Apple,
-  Thermometer,
-} from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import ConfigurationFinder from "./centralHVAC/configuration-finder/configuration-finder-component"
-
-export default function CentralHVACManual() {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-
-  const navigationItems = [
-    { label: "Products", hasDropdown: true },
-    { label: "For Business", hasDropdown: true },
-    { label: "For Utilities", hasDropdown: true },
-    { label: "Support", hasDropdown: true },
-  ]
-
-  const tabSections = [
-    { id: "installation", label: "Installation", active: true },
-    { id: "pairing", label: "Pairing" },
-    { id: "features", label: "Features" },
-    { id: "troubleshooting", label: "Troubleshooting" },
-  ]
-
-  const requiredTools = [
-    {
-      title: "Small Phillips (Cross) Screwdriver",
-      image: "/placeholder.svg?height=120&width=120&text=Small+Screwdriver",
-    },
-    {
-      title: "Larger Phillips (Cross) Screwdriver",
-      image: "/placeholder.svg?height=120&width=120&text=Large+Screwdriver",
-    },
-    {
-      title: "Optional: Wire Stripper",
-      image: "/placeholder.svg?height=120&width=120&text=Wire+Stripper",
-    },
-  ]
-
-  const appFeatures = [
-    {
-      icon: "🌙",
-      title: "Adaptive Brightness",
-      badge: "NEW",
-      description:
-        "Use Sleep and Wake On Approach to set your preferred display brightness and Mysa's display will adjust automatically to ambient light in your home.",
-    },
-    {
-      icon: "📱",
-      title: "Mobile App",
-      description: "Adjust your home heating from anywhere on your Android or iOS device.",
-    },
-    {
-      icon: "🏠",
-      title: "Smart Home Integration",
-      description: "Control Mysa through your favourite smart home platforms and home assistants.",
-    },
-    {
-      icon: "🌡️",
-      title: "Thermostat Control",
-      description: "Mysa displays the room temperature, and the touch buttons allow you to adjust it.",
-    },
-    {
-      icon: "📅",
-      title: "Custom Scheduling",
-      description: "Use the app to set a schedule for your thermostat in less than a minute.",
-    },
-    {
-      icon: "⏰",
-      title: "Early On",
-      description: "Start heating at the perfect moment to keep you cozy and save energy.",
-    },
-    {
-      icon: "🏘️",
-      title: "Zone Control",
-      description: "Group multiple Mysas into heating zones, and control them together through the Mysa app.",
-    },
-    {
-      icon: "🔒",
-      title: "Access Permissions",
-      description:
-        "Enjoy the peace of mind that comes with knowing you're in control of your preferred temperature setting.",
-    },
-    {
-      icon: "✈️",
-      title: "Vacation Mode",
-      description: "Going on vacation? Mysa will save energy while you're away.",
-    },
-    {
-      icon: "📍",
-      title: "Geolocation",
-      description:
-        "Mysa uses your location to detect if anyone is home, so that you're not paying to heat an empty house.",
-    },
-    {
-      icon: "📊",
-      title: "Energy Reports",
-      description: "Mysa generates in-depth energy reports so you can see how much you are spending - and saving.",
-    },
-    {
-      icon: "👥",
-      title: "Multiple Users",
-      description: "Share access to your account easily so others can control your Mysas through the Mysa app.",
-    },
-  ]
-
+export default function Home() {
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center">
-              <div className="text-2xl font-medium">
-                <span className="text-[#E91E63]">mysa</span>
-              </div>
-            </Link>
-
-            <nav className="hidden md:flex items-center space-x-8">
-              {navigationItems.map((item) => (
-                <div key={item.label} className="relative group">
-                  <button className="flex items-center text-[#6B7280] hover:text-[#2D2D2D] font-medium">
-                    {item.label}
-                    {item.hasDropdown && <ChevronDown className="ml-1 w-4 h-4" />}
-                  </button>
-                </div>
-              ))}
-            </nav>
-
-            <div className="hidden md:flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search manual..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-              <div className="flex items-center text-[#6B7280]">
-                <img src="/placeholder.svg?height=20&width=30&text=US" alt="US Flag" className="w-5 h-4 mr-1" />
-                <ChevronDown className="w-4 h-4" />
-              </div>
-              <MapPin className="w-5 h-5 text-[#6B7280]" />
-              <ShoppingCart className="w-5 h-5 text-[#6B7280]" />
-            </div>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
+    <main className="flex min-h-screen flex-col items-center justify-between p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
+        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-100 lg:p-4 lg:dark:bg-zinc-800/30">
+          Get started by editing&nbsp;
+          <code className="font-mono font-bold">app/page.tsx</code>
+        </p>
+        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
+          <a
+            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
+            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            By <Image src="/vercel.svg" alt="Vercel Logo" className="dark:invert" width={100} height={24} priority />
+          </a>
         </div>
-      </header>
+      </div>
 
-      {/* Hero Section */}
-      <section className="bg-white py-8">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl font-medium text-[#6B7280] mb-8">
-            Mysa Smart Thermostat for Central HVAC User Manual
-          </h1>
+      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-900 after:via-[#00c6a7] after:blur-xl after:content-[''] dark:before:bg-gradient-radial dark:before:from-white dark:before:to-transparent dark:after:from-[#007cf0] dark:after:via-[#00dfd8] dark:after:opacity-40 before:lg:h-[360px]">
+        <Image
+          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
+          src="/next.svg"
+          alt="Next.js Logo"
+          width={180}
+          height={37}
+          priority
+        />
+      </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-8 mb-8">
-            <div className="flex flex-col lg:flex-row items-center gap-8">
-              <div className="flex-1 text-left">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="text-2xl font-medium text-[#E91E63]">
-                    <span className="bg-[#E91E63] text-white px-3 py-1 rounded">V2</span>
-                    <span className="ml-3 text-[#E91E63]">Mysa Smart Thermostat</span>
-                  </div>
-                </div>
-                <div className="text-[#E91E63] text-xl font-medium mb-2">for Central HVAC</div>
-                <div className="text-2xl font-light text-[#6B7280] mb-4">User Manual</div>
-                <div className="text-lg font-medium text-[#2D2D2D] mb-6">V2</div>
-                <p className="text-[#6B7280] mb-6">
-                  Welcome to your easy, step-by-step guide to setting up your new Mysa for Central HVAC!
-                </p>
-                <Button className="bg-[#E91E63] hover:bg-[#d81b60] text-white border-2 border-[#E91E63]">
-                  Check Compatibility
-                </Button>
-              </div>
-              <div className="flex-1">
-                <Image
-                  src="/placeholder.svg?height=400&width=500&text=Mysa+Central+HVAC+Package"
-                  alt="Mysa Central HVAC Package"
-                  width={500}
-                  height={400}
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Tab Navigation */}
-          <div className="border-b border-gray-200 mb-8">
-            <nav className="flex space-x-8 overflow-x-auto">
-              {tabSections.map((section) => (
-                <button
-                  key={section.id}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
-                    section.active
-                      ? "border-[#E91E63] text-[#E91E63]"
-                      : "border-transparent text-[#6B7280] hover:text-[#2D2D2D] hover:border-gray-300"
-                  }`}
-                >
-                  {section.label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-      </section>
-
-      {/* Installing Mysa Section */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-medium text-[#6B7280] mb-8">Installing Mysa</h2>
-
-            {/* Mysa App Recommendation - Moved above Installation Instructions */}
-            <div className="mb-12">
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-8 text-center">
-                <div className="flex items-center justify-center gap-3 mb-4">
-                  <Smartphone className="w-8 h-8 text-blue-600" />
-                  <h3 className="text-2xl font-semibold text-[#2D2D2D]">Recommended Installation Method</h3>
-                </div>
-                <div className="bg-blue-100 rounded-lg p-4 mb-6">
-                  <p className="text-lg font-medium text-blue-800 mb-2">
-                    ⭐ Mysa strongly recommends using the Mysa App for installation instructions and pairing.
-                  </p>
-                  <p className="text-[#4B5563]">
-                    The app provides step-by-step guidance, interactive troubleshooting, and ensures the most up-to-date
-                    installation process.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                    <Image
-                      src="/placeholder.svg?height=20&width=20&text=Play"
-                      alt="Google Play"
-                      width={20}
-                      height={20}
-                    />
-                    Google Play
-                  </Button>
-                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                    <Apple className="w-4 h-4" />
-                    App Store
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Part 1: Installation Instructions */}
-            <div className="mb-12">
-              <h3 className="text-2xl font-medium text-[#6B7280] mb-4">Alternative Installation Instructions</h3>
-              <p className="text-[#6B7280] mb-6">
-                If you prefer not to use the app, you can follow these system-specific guides:
-              </p>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {/* Conventional Heat/Cooling */}
-                <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      <Thermometer className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <h4 className="font-medium text-[#2D2D2D] mb-2 text-sm">Conventional Heat/Cool</h4>
-                    <p className="text-xs text-[#6B7280] mb-3">Standard HVAC systems</p>
-                    <ArrowRight className="w-3 h-3 text-[#6B7280] group-hover:text-[#2D2D2D] mx-auto transition-all" />
-                  </CardContent>
-                </Card>
-
-                {/* Heat Pump with Auxiliary Heat */}
-                <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      <Settings className="w-4 h-4 text-orange-600" />
-                    </div>
-                    <h4 className="font-medium text-[#2D2D2D] mb-2 text-sm">Heat Pump + Aux</h4>
-                    <p className="text-xs text-[#6B7280] mb-3">With backup heat</p>
-                    <ArrowRight className="w-3 h-3 text-[#6B7280] group-hover:text-[#2D2D2D] mx-auto transition-all" />
-                  </CardContent>
-                </Card>
-
-                {/* Boiler/Radiant System */}
-                <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      <FileText className="w-4 h-4 text-green-600" />
-                    </div>
-                    <h4 className="font-medium text-[#2D2D2D] mb-2 text-sm">Boiler/Radiant</h4>
-                    <p className="text-xs text-[#6B7280] mb-3">Heat only systems</p>
-                    <ArrowRight className="w-3 h-3 text-[#6B7280] group-hover:text-[#2D2D2D] mx-auto transition-all" />
-                  </CardContent>
-                </Card>
-
-                {/* Installing with C-Wire Adapter */}
-                <Card className="group hover:shadow-md transition-all duration-300 cursor-pointer border shadow-sm">
-                  <CardContent className="p-4 text-center">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                      <AlertCircle className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <h4 className="font-medium text-[#2D2D2D] mb-2 text-sm">C-Wire Adapter</h4>
-                    <p className="text-xs text-[#6B7280] mb-3">Power adapter install</p>
-                    <ArrowRight className="w-3 h-3 text-[#6B7280] group-hover:text-[#2D2D2D] mx-auto transition-all" />
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Help with Installation */}
-            <div className="mb-12">
-              <Alert className="border-[#E91E63] bg-pink-50">
-                <AlertCircle className="h-4 w-4 text-[#E91E63]" />
-                <AlertDescription className="text-[#E91E63] flex items-center justify-between">
-                  <span>Need help with installation?</span>
-                  <Button variant="outline" size="sm" className="border-[#E91E63] text-[#E91E63] bg-transparent">
-                    Find a Mysa Pro
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </div>
-
-            {/* Part 2: Configuration Code Finder */}
-            <div className="mb-12">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-medium text-[#6B7280] mb-4">Configuration Code Finder</h3>
-                <p className="text-lg text-[#6B7280]">
-                  Find the right configuration settings for your specific HVAC system before installation
-                </p>
-              </div>
-
-              <div className="bg-white rounded-2xl p-8 border">
-                <ConfigurationFinder />
-              </div>
-            </div>
-          </div>
-
-          {/* Step-by-Step Installation Guide */}
-
-          {/* High Voltage Warning */}
-          <div className="bg-[#E91E63] text-white rounded-lg p-8 mb-12">
-            <div className="flex items-start gap-6">
-              <div className="flex-1">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="text-2xl font-medium">
-                    <span className="bg-white text-[#E91E63] px-3 py-1 rounded">V2</span>
-                  </div>
-                  <h3 className="text-2xl font-bold">Warning! High Voltage!</h3>
-                </div>
-                <p className="text-lg mb-4">
-                  Installing this product involves handling high voltage wiring. Follow these installation instructions
-                  carefully.
-                </p>
-                <p className="mb-4">
-                  To avoid fire, personal injury, or death, turn off your circuit breakers and follow the proper safety
-                  precautions before proceeding.
-                </p>
-                <p className="font-bold mb-4">
-                  UNSURE ABOUT HANDLING ELECTRICAL WIRING? CONSULT A QUALIFIED ELECTRICIAN.
-                </p>
-                <p className="text-sm">
-                  The installation of the thermostat must comply with the applicable Local and/or National Electrical
-                  codes and utility requirements. This installation should be entrusted to duly qualified personnel
-                  where required by law.
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <div className="bg-white rounded-lg p-4">
-                  <Image
-                    src="/placeholder.svg?height=150&width=200&text=Electrical+Warning"
-                    alt="Electrical safety warning"
-                    width={200}
-                    height={150}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* What You'll Need */}
-          <div className="bg-white rounded-lg p-8">
-            <h3 className="text-2xl font-medium text-[#6B7280] text-center mb-8">What you'll need</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {requiredTools.map((tool, index) => (
-                <div key={index} className="text-center">
-                  <div className="bg-gray-50 rounded-lg p-6 mb-4 aspect-square flex items-center justify-center">
-                    <Image src={tool.image || "/placeholder.svg"} alt={tool.title} width={80} height={80} />
-                  </div>
-                  <p className="text-[#6B7280] font-medium">{tool.title}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Download App Section */}
-      <section className="py-16 bg-[#6B7280]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            <div className="flex-1">
-              <Image
-                src="/placeholder.svg?height=400&width=400&text=Mysa+App+on+Phone"
-                alt="Mysa app on smartphone"
-                width={400}
-                height={400}
-                className="rounded-lg"
-              />
-            </div>
-            <div className="flex-1 text-white">
-              <h2 className="text-3xl font-medium mb-6">Download the Mysa App</h2>
-              <p className="text-lg mb-8 leading-relaxed">
-                The Mysa app is where all your important smart features live! Use it to easily set Schedules, set up
-                Geofencing for when you're on the move, and monitor your Energy Usage to find more ways to save.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                  <Image src="/placeholder.svg?height=24&width=24&text=Play" alt="Google Play" width={24} height={24} />
-                  GET IT ON Google Play
-                </Button>
-                <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                  <Apple className="w-5 h-5" />
-                  Download on the App Store
-                </Button>
-              </div>
-              <p className="text-sm">
-                Download the latest version Mysa app from the Google Play Store or App Store and create an account (or
-                log in to your existing account).
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pairing Section */}
-      <section className="py-16 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-start gap-12 mb-12">
-            <div className="flex-1">
-              <h2 className="text-3xl font-medium text-[#6B7280] mb-6">Pairing your Mysa</h2>
-              <div className="text-[#E91E63] text-xl font-medium mb-6">How to pair:</div>
-              <ol className="space-y-4 text-[#6B7280]">
-                <li>1. Open the Mysa App.</li>
-                <li>2. Navigate to Add Thermostat.</li>
-                <li>3. Select Central HVAC.</li>
-                <li>4. Follow app instructions or video in the next section.</li>
-              </ol>
-            </div>
-            <div className="flex-1">
-              <Image
-                src="/placeholder.svg?height=300&width=250&text=Phone+App+Screen"
-                alt="Mysa app pairing screen"
-                width={250}
-                height={300}
-                className="rounded-lg"
-              />
-            </div>
-          </div>
-
-          <Alert className="mb-12 border-[#E91E63] bg-pink-50">
-            <AlertCircle className="h-4 w-4 text-[#E91E63]" />
-            <AlertDescription className="text-[#E91E63] flex items-center justify-between">
-              <span>Need help with pairing?</span>
-              <Button variant="outline" size="sm" className="border-[#E91E63] text-[#E91E63] bg-transparent">
-                Contact Support
-              </Button>
-            </AlertDescription>
-          </Alert>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card className="border-2">
-              <CardHeader className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Apple className="w-6 h-6" />
-                  <CardTitle className="text-xl text-[#6B7280]">Pairing with iOS</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="text-center">
-                <Image
-                  src="/placeholder.svg?height=400&width=250&text=iOS+Pairing+Screen"
-                  alt="iOS pairing screen"
-                  width={250}
-                  height={400}
-                  className="mx-auto rounded-lg"
-                />
-              </CardContent>
-            </Card>
-
-            <Card className="border-2">
-              <CardHeader className="text-center">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <Smartphone className="w-6 h-6" />
-                  <CardTitle className="text-xl text-[#6B7280]">Pairing with Android</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="text-center">
-                <Image
-                  src="/placeholder.svg?height=400&width=250&text=Android+Pairing+Screen"
-                  alt="Android pairing screen"
-                  width={250}
-                  height={400}
-                  className="mx-auto rounded-lg"
-                />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Manual Controls */}
-      <section className="py-16 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-medium text-[#6B7280] text-center mb-8">Manual Controls</h2>
-          <p className="text-[#6B7280] text-center mb-12 max-w-4xl mx-auto">
-            Mysa for Central HVAC can be adjusted manually at any time by pressing the Up or Down arrow to increase or
-            decrease the set point temperature. By default, Mysa will display the room temperature. When manually
-            adjusting the temperature, the setpoint will display, allowing you to set your ideal climate for the room.
+      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
+        <a
+          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <h2 className={`mb-3 text-2xl font-semibold`}>
+            Docs{" "}
+            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+          </h2>
+          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+            Find in-depth information about Next.js features and API.
           </p>
+        </a>
 
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            <div className="flex-1">
-              <div className="relative">
-                <Image
-                  src="/placeholder.svg?height=400&width=300&text=Mysa+Thermostat+Controls"
-                  alt="Mysa thermostat with control labels"
-                  width={300}
-                  height={400}
-                  className="mx-auto"
-                />
-                <div className="absolute left-0 top-1/4 text-right pr-4">
-                  <div className="text-[#6B7280] font-medium">Temperature</div>
-                  <div className="text-[#6B7280] font-medium">Control Arrows</div>
-                </div>
-                <div className="absolute right-0 bottom-1/4 text-left pl-4">
-                  <div className="text-[#6B7280] font-medium">Proximity &</div>
-                  <div className="text-[#6B7280] font-medium">Ambient</div>
-                  <div className="text-[#6B7280] font-medium">Light Sensor</div>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1">
-              <h3 className="text-2xl font-medium text-[#2D2D2D] mb-6">App Controls</h3>
-              <p className="text-[#6B7280] mb-8">
-                The Mysa app works seamlessly across all four of our products, allowing for easy remote access,
-                Scheduling, Geofencing, and more!
-              </p>
-              <p className="text-[#6B7280] mb-8">
-                Here's an example of what your Mysa for Central HVAC thermostat control screen looks like on your
-                smartphone:
-              </p>
-              <Image
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-tPw2vab1ffYhixsrZgLtVk4vqstkdX.png"
-                alt="Mysa app control screen"
-                width={400}
-                height={600}
-                className="rounded-lg"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* App Features */}
-      <section className="py-16 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-medium text-[#6B7280] text-center mb-12">App Features</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-            {appFeatures.map((feature, index) => (
-              <div key={index} className="bg-white rounded-lg p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-2xl">{feature.icon}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-medium text-[#2D2D2D]">{feature.title}</h3>
-                      {feature.badge && <Badge className="bg-[#E91E63] text-white text-xs">{feature.badge}</Badge>}
-                    </div>
-                    <p className="text-[#6B7280] text-sm">{feature.description}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="text-center">
-            <Button
-              variant="outline"
-              className="border-[#E91E63] text-[#E91E63] hover:bg-[#E91E63] hover:text-white bg-transparent"
-            >
-              View All Mysa App Features
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Quick Access Sections */}
-      <section className="py-16 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl font-medium text-[#2D2D2D] text-center mb-12">Quick Access</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Link href="/centralHVAC/configuration-finder">
-              <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
-                <CardHeader className="bg-blue-50 border-b border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <Settings className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
-                        Configuration Code Finder
-                      </CardTitle>
-                      <CardDescription className="text-[#6B7280] text-sm">Interactive Flow</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 flex-1 flex flex-col">
-                  <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
-                    Find the right configuration settings for your specific HVAC system with our interactive tool.
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#6B7280]">Get Started</span>
-                    <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/centralHVAC/troubleshooting">
-              <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
-                <CardHeader className="bg-red-50 border-b border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <AlertCircle className="w-6 h-6 text-red-600" />
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
-                        Troubleshooting
-                      </CardTitle>
-                      <CardDescription className="text-[#6B7280] text-sm">Get Help</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 flex-1 flex flex-col">
-                  <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
-                    Common issues, error codes, and solutions to get your Mysa thermostat working properly.
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#6B7280]">Get Help</span>
-                    <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/centralHVAC/advanced-installation">
-              <Card className="group hover:shadow-lg transition-all duration-300 cursor-pointer border-0 shadow-sm h-full">
-                <CardHeader className="bg-green-50 border-b border-gray-200">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FileText className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-xl text-[#2D2D2D] mb-1 group-hover:text-[#1a1a1a]">
-                        Advanced Installation
-                      </CardTitle>
-                      <CardDescription className="text-[#6B7280] text-sm">Wiring & Setup</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-6 flex-1 flex flex-col">
-                  <p className="text-[#4B5563] leading-relaxed flex-1 mb-4">
-                    Comprehensive installation resources for complex HVAC systems and specialized configurations.
-                  </p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-[#6B7280]">Learn More</span>
-                    <ArrowRight className="w-4 h-4 text-[#6B7280] group-hover:text-[#2D2D2D] group-hover:translate-x-1 transition-all" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Support CTA */}
-      <section className="py-16 bg-[#2D2D2D]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-medium text-white mb-4">Need Additional Help?</h2>
-          <p className="text-xl text-gray-300 mb-8">
-            Our support team is here to help with any questions about your Mysa thermostat.
+        <a
+          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <h2 className={`mb-3 text-2xl font-semibold`}>
+            Learn{" "}
+            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+          </h2>
+          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+            Learn about Next.js in an interactive course with&nbsp;quizzes!
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              variant="outline"
-              className="bg-transparent border-white text-white hover:bg-white hover:text-[#2D2D2D]"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Download Complete Manual
-            </Button>
-            <Button className="bg-[#BAE5D4] text-[#2D2D2D] hover:bg-[#a8dcc7]">Contact Support Team</Button>
-          </div>
-        </div>
+        </a>
+
+        <a
+          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <h2 className={`mb-3 text-2xl font-semibold`}>
+            Templates{" "}
+            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+          </h2>
+          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+            Discover and deploy boilerplate example Next.js&nbsp;projects.
+          </p>
+        </a>
+
+        <a
+          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
+          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <h2 className={`mb-3 text-2xl font-semibold`}>
+            Deploy{" "}
+            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
+              -&gt;
+            </span>
+          </h2>
+          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
+            Instantly deploy your Next.js site to a shareable URL with&nbsp;Vercel.
+          </p>
+        </a>
+      </div>
+
+      {/* Mysa App Recommendation Section */}
+      <section>
+        <h2>Recommended: Use the Mysa App for Installation</h2>
+        <p>
+          Mysa strongly recommends using the official Mysa App for step-by-step installation instructions and device
+          pairing for the best experience.
+        </p>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-            <div className="col-span-2">
-              <div className="text-2xl font-medium mb-4">
-                <span className="text-[#E91E63]">mysa</span>
-              </div>
-              <p className="text-[#6B7280] text-sm leading-relaxed">
-                Smart thermostats for baseboard heating, mini-split heat pumps, and central HVAC systems.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#2D2D2D] mb-4">Products</h3>
-              <ul className="space-y-2 text-sm text-[#6B7280]">
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Central HVAC
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Baseboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Mini-Split
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#2D2D2D] mb-4">Support</h3>
-              <ul className="space-y-2 text-sm text-[#6B7280]">
-                <li>
-                  <Link href="/centralHVAC/configuration-finder" className="hover:text-[#2D2D2D]">
-                    Configuration Finder
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/centralHVAC/troubleshooting" className="hover:text-[#2D2D2D]">
-                    Troubleshooting
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Contact Us
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            <div>
-              <h3 className="font-semibold text-[#2D2D2D] mb-4">Company</h3>
-              <ul className="space-y-2 text-sm text-[#6B7280]">
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    About
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Careers
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="hover:text-[#2D2D2D]">
-                    Press
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-[#6B7280] text-sm">© 2024 Mysa Smart Thermostats. All rights reserved.</p>
-            <div className="flex gap-6 mt-4 md:mt-0">
-              <Link href="#" className="text-[#6B7280] hover:text-[#2D2D2D] text-sm">
-                Privacy
-              </Link>
-              <Link href="#" className="text-[#6B7280] hover:text-[#2D2D2D] text-sm">
-                Terms
-              </Link>
-              <Link href="#" className="text-[#6B7280] hover:text-[#2D2D2D] text-sm">
-                Warranty
-              </Link>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+      {/* Installation Instructions Section */}
+      <section>
+        <h2>Installing Mysa</h2>
+        <p>Follow these steps to install Mysa:</p>
+        <ol>
+          <li>Step 1...</li>
+          <li>Step 2...</li>
+          <li>Step 3...</li>
+        </ol>
+      </section>
+    </main>
   )
 }
