@@ -243,9 +243,46 @@ export default function CentralHVACManual() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-medium text-[#6B7280] mb-8">Installing Mysa</h2>
 
+            {/* Mysa App Recommendation - Moved above Installation Instructions */}
+            <div className="mb-12">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-8 text-center">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <Smartphone className="w-8 h-8 text-blue-600" />
+                  <h3 className="text-2xl font-semibold text-[#2D2D2D]">Recommended Installation Method</h3>
+                </div>
+                <div className="bg-blue-100 rounded-lg p-4 mb-6">
+                  <p className="text-lg font-medium text-blue-800 mb-2">
+                    ⭐ Mysa strongly recommends using the Mysa App for installation instructions and pairing.
+                  </p>
+                  <p className="text-[#4B5563]">
+                    The app provides step-by-step guidance, interactive troubleshooting, and ensures the most up-to-date
+                    installation process.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
+                    <Image
+                      src="/placeholder.svg?height=20&width=20&text=Play"
+                      alt="Google Play"
+                      width={20}
+                      height={20}
+                    />
+                    Google Play
+                  </Button>
+                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
+                    <Apple className="w-4 h-4" />
+                    App Store
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Part 1: Installation Instructions */}
             <div className="mb-12">
-              <h3 className="text-2xl font-medium text-[#6B7280] mb-6">Installation Instructions</h3>
+              <h3 className="text-2xl font-medium text-[#6B7280] mb-4">Alternative Installation Instructions</h3>
+              <p className="text-[#6B7280] mb-6">
+                If you prefer not to use the app, you can follow these system-specific guides:
+              </p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {/* Conventional Heat/Cooling */}
@@ -295,34 +332,6 @@ export default function CentralHVACManual() {
                     <ArrowRight className="w-3 h-3 text-[#6B7280] group-hover:text-[#2D2D2D] mx-auto transition-all" />
                   </CardContent>
                 </Card>
-              </div>
-            </div>
-
-            {/* Mysa App Recommendation */}
-            <div className="mb-8">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                <div className="flex items-center justify-center gap-3 mb-3">
-                  <Smartphone className="w-6 h-6 text-blue-600" />
-                  <h4 className="text-lg font-medium text-[#2D2D2D]">Recommended Installation Method</h4>
-                </div>
-                <p className="text-[#4B5563] mb-4">
-                  Mysa recommends using the Mysa App for installation instructions and pairing.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                    <Image
-                      src="/placeholder.svg?height=20&width=20&text=Play"
-                      alt="Google Play"
-                      width={20}
-                      height={20}
-                    />
-                    Google Play
-                  </Button>
-                  <Button className="bg-black hover:bg-gray-800 text-white flex items-center gap-2">
-                    <Apple className="w-4 h-4" />
-                    App Store
-                  </Button>
-                </div>
               </div>
             </div>
 
