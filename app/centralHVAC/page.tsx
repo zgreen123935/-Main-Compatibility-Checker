@@ -12,18 +12,15 @@ import {
   AlertCircle,
   Menu,
   X,
-  Search,
   ArrowRight,
   Smartphone,
   Apple,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import ConfigurationFinder from "./centralHVAC/configuration-finder/configuration-finder-component"
 
 export default function CentralHVACManual() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -37,10 +34,32 @@ export default function CentralHVACManual() {
   ]
 
   const tabSections = [
-    { id: "installation", label: "Installation", active: true },
+    { id: "welcome", label: "Welcome", active: true },
+    { id: "whats-in-box", label: "What's in the Box?" },
+    { id: "installation", label: "Installation" },
     { id: "pairing", label: "Pairing" },
+    { id: "display-icons", label: "Display Icons" },
     { id: "features", label: "Features" },
     { id: "troubleshooting", label: "Troubleshooting" },
+  ]
+
+  const boxContents = [
+    {
+      title: "1x Mysa for Central HVAC",
+      image: "/placeholder.svg?height=200&width=200&text=Mysa+Thermostat",
+    },
+    {
+      title: "2x Mounting Screws",
+      image: "/placeholder.svg?height=200&width=200&text=Screws",
+    },
+    {
+      title: "3x Wire Nuts",
+      image: "/placeholder.svg?height=200&width=200&text=Wire+Nuts",
+    },
+    {
+      title: "Wiring Instructions",
+      image: "/placeholder.svg?height=200&width=200&text=Instructions",
+    },
   ]
 
   const requiredTools = [
@@ -125,6 +144,29 @@ export default function CentralHVACManual() {
     },
   ]
 
+  const displayIcons = [
+    {
+      title: "WELCOME",
+      description: "You'll see Mysa smile on startup.",
+      pattern: "⚫⚫\n⚫⚫⚫⚫⚫⚫⚫\n⚫",
+    },
+    {
+      title: "WIFI PAIRING",
+      description: "The arrow means Mysa is ready to begin the WiFi pairing process.",
+      pattern: "⚫⚫⚫⚫⚫⚫⚫\n⚫⚫⚫⚫⚫",
+    },
+    {
+      title: "UPDATE",
+      description: "That spinning rectangle means Mysa is getting a software update from us over the internet.",
+      pattern: "⚫⚫⚫⚫⚫⚫⚫\n⚫⚫⚫⚫⚫⚫⚫\n⚫",
+    },
+    {
+      title: "SETTINGS",
+      description: "Check! This will pop up when you change your settings from the app.",
+      pattern: "⚫\n⚫⚫⚫\n⚫",
+    },
+  ]
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
@@ -149,15 +191,6 @@ export default function CentralHVACManual() {
             </nav>
 
             <div className="hidden md:flex items-center space-x-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search manual..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
               <div className="flex items-center text-[#6B7280]">
                 <img src="/placeholder.svg?height=20&width=30&text=US" alt="US Flag" className="w-5 h-4 mr-1" />
                 <ChevronDown className="w-4 h-4" />
@@ -236,53 +269,94 @@ export default function CentralHVACManual() {
         </div>
       </section>
 
-      {/* Installing Mysa Section */}
+      {/* Welcome Section */}
+      <section className="py-16 bg-[#6B7280]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            <div className="flex-1 text-white">
+              <h2 className="text-4xl font-light mb-6">Hello, friend.</h2>
+              <p className="text-xl mb-6 leading-relaxed">
+                Thank you for purchasing the Mysa Smart Thermostat for Central HVAC V2!
+              </p>
+              <p className="text-lg leading-relaxed">
+                Your online guide shows you how to easily set up, use, and troubleshoot your Mysa. Mysa for Central HVAC
+                is compatible with most forced air, heat pump, hydronic, and fan coil heating and cooling systems.
+              </p>
+            </div>
+            <div className="flex-1">
+              <div className="bg-gray-200 rounded-2xl p-4">
+                <Image
+                  src="/placeholder.svg?height=300&width=400&text=Person+Installing+Mysa"
+                  alt="Person installing Mysa thermostat"
+                  width={400}
+                  height={300}
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* What's in the Box */}
+      <section className="py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-medium text-[#6B7280] text-center mb-12">What's in the Box?</h2>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            {boxContents.map((item, index) => (
+              <div key={index} className="text-center">
+                <div className="bg-gray-100 rounded-lg p-6 mb-4 aspect-square flex items-center justify-center">
+                  <Image
+                    src={item.image || "/placeholder.svg"}
+                    alt={item.title}
+                    width={120}
+                    height={120}
+                    className="rounded"
+                  />
+                </div>
+                <p className="text-[#6B7280] font-medium">{item.title}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-gray-100 rounded-2xl p-8">
+            <Image
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-rj0sCjOggFWNsyb2JJNxazumvokUhu.png"
+              alt="Complete Mysa package contents"
+              width={800}
+              height={600}
+              className="w-full rounded-lg"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Installation Section */}
       <section className="py-16 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-medium text-[#6B7280] mb-8">Installing Mysa</h2>
-
-            {/* Part 1: Installation Instructions */}
-            <div className="mb-12">
-              <h3 className="text-2xl font-medium text-[#6B7280] mb-8">Installation Instructions</h3>
-              <div className="bg-white rounded-lg border p-8 mb-8">
-                <div className="text-center mb-6">
-                  <div className="text-4xl font-medium text-[#E91E63] mb-4">mysa</div>
-                  <p className="text-[#6B7280] mb-2">Mysa Installation and Compatibility Guide</p>
-                  <p className="text-[#6B7280] mb-6">Installation de Mysa et Guide de compatibilité</p>
-                  <Button className="bg-[#E91E63] hover:bg-[#d81b60] text-white px-8">
-                    Start <span className="ml-2 text-sm">press Enter ↵</span>
-                  </Button>
-                </div>
+            <div className="bg-white rounded-lg border p-8 mb-8">
+              <div className="text-center mb-6">
+                <div className="text-4xl font-medium text-[#E91E63] mb-4">mysa</div>
+                <p className="text-[#6B7280] mb-2">Mysa Installation and Compatibility Guide</p>
+                <p className="text-[#6B7280] mb-6">Installation de Mysa et Guide de compatibilité</p>
+                <Button className="bg-[#E91E63] hover:bg-[#d81b60] text-white px-8">
+                  Start <span className="ml-2 text-sm">press Enter ↵</span>
+                </Button>
               </div>
             </div>
 
-            {/* Help with Installation */}
-            <div className="mb-12">
-              <Alert className="border-[#E91E63] bg-pink-50">
-                <AlertCircle className="h-4 w-4 text-[#E91E63]" />
-                <AlertDescription className="text-[#E91E63] flex items-center justify-between">
-                  <span>Need help with installation?</span>
-                  <Button variant="outline" size="sm" className="border-[#E91E63] text-[#E91E63] bg-transparent">
-                    Find a Mysa Pro
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </div>
-
-            {/* Part 2: Configuration Code Finder */}
-            <div className="mb-12">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-medium text-[#6B7280] mb-4">Configuration Code Finder</h3>
-                <p className="text-lg text-[#6B7280]">
-                  Find the right configuration settings for your specific HVAC system before installation
-                </p>
-              </div>
-
-              <div className="bg-white rounded-2xl p-8 border">
-                <ConfigurationFinder />
-              </div>
-            </div>
+            <Alert className="mb-8 border-[#E91E63] bg-pink-50">
+              <AlertCircle className="h-4 w-4 text-[#E91E63]" />
+              <AlertDescription className="text-[#E91E63] flex items-center justify-between">
+                <span>Need help with installation?</span>
+                <Button variant="outline" size="sm" className="border-[#E91E63] text-[#E91E63] bg-transparent">
+                  Find a Mysa Pro
+                </Button>
+              </AlertDescription>
+            </Alert>
           </div>
 
           {/* High Voltage Warning */}
@@ -451,6 +525,29 @@ export default function CentralHVACManual() {
                 />
               </CardContent>
             </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Display Icons */}
+      <section className="py-16 bg-[#E91E63]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl font-medium text-white text-center mb-4">Display Icons</h2>
+          <p className="text-white text-center mb-12">
+            There are four common display icons that will appear on your Mysa's faceplate display when pairing or
+            updating.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {displayIcons.map((icon, index) => (
+              <div key={index} className="bg-white rounded-lg p-6 text-center">
+                <div className="bg-[#E91E63] text-white rounded-lg p-4 mb-4 min-h-[120px] flex items-center justify-center">
+                  <div className="font-mono text-2xl leading-tight whitespace-pre-line">{icon.pattern}</div>
+                </div>
+                <h3 className="font-bold text-[#2D2D2D] mb-2">{icon.title}</h3>
+                <p className="text-[#6B7280] text-sm">{icon.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
