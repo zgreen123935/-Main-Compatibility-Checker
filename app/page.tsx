@@ -1,4 +1,6 @@
 import Image from "next/image"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
   return (
@@ -102,23 +104,31 @@ export default function Home() {
       </div>
 
       {/* Mysa App Recommendation Section */}
-      <section>
-        <h2>Recommended: Use the Mysa App for Installation</h2>
-        <p>
+      <section className="mb-32">
+        <h2 className="text-3xl font-medium text-[#2D2D2D] mb-6">Recommended: Use the Mysa App for Installation</h2>
+        <p className="text-[#6B7280] mb-8 text-lg">
           Mysa strongly recommends using the official Mysa App for step-by-step installation instructions and device
           pairing for the best experience.
         </p>
       </section>
 
       {/* Installation Instructions Section */}
-      <section>
-        <h2>Installing Mysa</h2>
-        <p>Follow these steps to install Mysa:</p>
-        <ol>
+      <section className="mb-32">
+        <h2 className="text-3xl font-medium text-[#2D2D2D] mb-6">Installing Mysa</h2>
+        <p className="text-[#6B7280] mb-8 text-lg">Follow these steps to install Mysa:</p>
+        <ol className="list-decimal list-inside mb-8">
           <li>Step 1...</li>
           <li>Step 2...</li>
           <li>Step 3...</li>
         </ol>
+        <div className="space-y-4">
+          <Link href="/centralHVAC">
+            <Button className="bg-[#E91E63] hover:bg-[#d81b60] text-white px-8 py-3 text-lg">
+              Central HVAC Manual
+            </Button>
+          </Link>
+          <div className="text-sm text-[#6B7280]">More product manuals coming soon</div>
+        </div>
       </section>
     </main>
   )
